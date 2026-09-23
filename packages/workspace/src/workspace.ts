@@ -212,6 +212,17 @@ export class Workspace {
 
   // ─── Reading ──────────────────────────────────────────────────────────────
 
+  /**
+   * A path as the project's site serves it (standalone): what fs:read may read, and never
+   * a declared secret file — fs:read shows it scrambled, a page would show it raw. Where it
+   * is on disk, or a WorkspaceError when there is nothing to serve there.
+   */
+  async served(path: string): Promise<{ rel: string; abs: string; isDir: boolean }> {
+    const target = await this.resolve(path);
+    if (!target.isDir && (await this.secretFormat(target))) throw new WorkspaceError(`"${target.rel}" does not exist`);
+    return { rel: target.rel, abs: target.abs, isDir: target.isDir };
+  }
+
   async list(path: string, depth: number): Promise<{ text: string; entries: number; hidden: number; truncated: boolean }> {
     const start = await this.resolve(path);
     if (!start.isDir) throw new WorkspaceError(`"${start.rel}" is a file; use fs:read`);

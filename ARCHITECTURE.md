@@ -18,6 +18,9 @@ names an image, never picks a docker flag and never names a host path.
 | `app:*` | the session's web app, behind the shared edge | the daemon: an [octopod](https://github.com/quazardous/octopod) recipe plus bushwhack's own layer; octopod renders, runs and routes it | **built** |
 | `page:*` | the app's page, in a tab the extension opened for it | the extension's service worker, dispatched by the daemon over the relay | **built** |
 
+Installed standalone (no Docker, no octopod), there are no `app:*` tools: the project's
+files are served as they are, and `page:*` looks at them — see *Standalone* under **The app**.
+
 Composing an environment from arbitrary modules (a database, a Python bench, …) is
 octopod's (its recipes), and **not exposed to the model**: a session composes exactly one
 thing, a web app, from octopod's app recipes.
@@ -219,6 +222,28 @@ terminal prompt, and `app:create` shows octopod's plan there (`octopod plan`: re
 digest, image and how it is built, files mounted read-write) with bushwhack's own lines
 (network, what is hidden). Logs and command output are masked against declared secrets like
 every other result.
+
+### Standalone: the files, served as they are
+
+A minimal install (`setup.sh --standalone`, recorded as `"mode": "standalone"` in
+`~/.config/bushwhack/config.json`, which `bushwhack mode` reads and writes) has no octopod
+and no Docker. The mode is chosen, never fallen back to: a normal install without octopod
+has no app at all, and a standalone one never asks octopod, even when it is there.
+
+- **One server for the process** (`ProjectSites`), on `127.0.0.1`, the first free port of
+  47320–47329; each project at `http://<project>.localhost:<port>/`, told apart by the Host
+  header — any other Host, a DNS name rebound to 127.0.0.1 included, gets a 404. GET and
+  HEAD only, no CORS header, `no-store`: after an edit, the page is the edited one.
+- **What it serves is the workspace's to decide** (`Workspace.served`): what `fs:read`
+  reads — the jail, the ignore rules, `.git/` and `.bushwhack/` — and never a declared
+  secret file, which `fs:read` shows scrambled and a page would show raw. Hidden and
+  missing answer alike. A folder serves its `index.html`.
+- **Nothing of the project runs on the machine**: no `npm run dev`, no build, no server
+  code. There are no `app:*` tools; `page:*` looks at the site, and `page:open`'s notes tell
+  the model what the site is — files only — and what to build there: what works in the
+  browser alone, its data in the page (localStorage, IndexedDB, SQLite through WebAssembly).
+- The site's address is the app's address everywhere else: `/health` reports it, so the
+  extension finds the project's tab as it does an octopod app's.
 
 ## Secrets
 

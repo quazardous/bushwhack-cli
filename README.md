@@ -15,7 +15,8 @@ write, edit, move or delete stops in your terminal for a yes or no.
 
 Status: early. What works today: file access from meta.ai, Gemini and ChatGPT, secret files, and a web app
 per project served at `http://<project>.localhost` (needs Docker and
-[octopod](https://github.com/quazardous/octopod) — `octopod` on the PATH, or `BUSHWHACK_OCTOPOD` pointing at it).
+[octopod](https://github.com/quazardous/octopod) — `octopod` on the PATH, or `BUSHWHACK_OCTOPOD` pointing at it; or,
+installed `--standalone`, the project's files served as they are, with neither).
 The model can also look at that app's page — read it, click, fill, see its console and
 requests, and get a picture of it — in a background tab the extension opens for it, and
 never on any other site (see [ARCHITECTURE.md](./ARCHITECTURE.md)).
@@ -30,7 +31,12 @@ git clone https://github.com/quazardous/bushwhack-cli bushwhack && cd bushwhack
 ```
 
 On Windows, run `.\setup.ps1` in PowerShell instead (the service then runs as a background
-process; the web app tools are untested there).
+process).
+
+A minimal install, without Docker or octopod: `./setup.sh --standalone` (`.\setup.ps1
+-Standalone`). The chat's app is then the project's own files, served as they are at
+`http://<project>.localhost:47320/` — HTML, CSS and JavaScript in the browser, nothing run
+on your machine, no `app:*` tools. `bushwhack mode` says which mode is set, and changes it.
 
 Load the extension once: `chrome://extensions` → enable **Developer mode** → **Load
 unpacked** → pick `extension/dist`.

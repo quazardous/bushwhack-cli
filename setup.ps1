@@ -4,13 +4,17 @@ command on your PATH. Safe to run again (after a pull, for instance). Needs no a
 
   .\setup.ps1                        # puts the command in ~\.local\bin
   .\setup.ps1 -Dev                   # the same, for development: no production extension build
+  .\setup.ps1 -Standalone            # a minimal install: no Docker, no octopod - the chat's app is
+                                     # the project's files served as they are, nothing run
   $env:BIN_DIR="$HOME\bin"; .\setup.ps1   # ... or elsewhere
 
 The command runs the sources: a change to the code needs no new setup, only a restart of
-what runs it. Run it again after a dependency change.
+what runs it. Run it again after a dependency change. The mode (standalone or octopod) is
+kept across runs: `bushwhack mode` says it and changes it.
 #>
 param(
   [switch]$Dev,
+  [switch]$Standalone,
   [switch]$Help
 )
 $ErrorActionPreference = 'Stop'
@@ -85,34 +89,45 @@ if (-not $onPath) {
   Write-Host '  then open a new terminal'
 }
 
-Say 'Web app tools (optional)'
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-  Warn 'Docker is not installed: the chat will get the file and secret tools only'
-} elseif (-not $(docker compose version 2>$null | Out-Null; $LASTEXITCODE -eq 0)) {
-  Warn 'Docker Compose v2 (docker compose) is missing: the app tools need it'
-} elseif (-not $(docker info 2>$null | Out-Null; $LASTEXITCODE -eq 0)) {
-  Warn 'Docker does not answer: start Docker Desktop, then run this again (the app tools need it)'
-} elseif ($env:BUSHWHACK_OCTOPOD -or (Get-Command octopod -ErrorAction SilentlyContinue)) {
-  $octopod = if ($env:BUSHWHACK_OCTOPOD) { $env:BUSHWHACK_OCTOPOD } else { (Get-Command octopod).Source }
-  # The contract bushwhack speaks (OCTOPOD_CONTRACT in packages/daemon/src/octopod-client.ts).
-  $said = try { & $octopod version --json 2>$null | Out-String } catch { '' }
-  $v = try { $said | ConvertFrom-Json } catch { $null }
-  if (-not $v -or -not $v.contract) {
-    Warn "octopod at $octopod does not answer ``octopod version`` (older than 0.1, or a broken install): npm i -g @quazardous/octopod - the app tools stay off until then"
-  } elseif ("$($v.contract)" -eq '1') {
-    Write-Host "  octopod: $octopod ($($v.version), contract 1)"
-    # Contract 1 since 0.1, but Windows works from 0.3: docker compose was not found before.
-    $mm = "$($v.version)" -split '[.-]'
-    if ([int]$mm[0] -eq 0 -and [int]$mm[1] -lt 3) {
-      Warn "octopod $($v.version) predates its Windows fixes (0.3): update it (npm i -g @quazardous/octopod, or git pull and .\setup.ps1 in its clone)"
+$bushwhack = Join-Path $Root 'bin\bushwhack.cmd'
+if ($Standalone) { & $bushwhack mode standalone | Out-Null }
+$mode = ((& $bushwhack mode) -split '\s+' | Where-Object { $_ })[0]
+
+if ($mode -eq 'standalone') {
+  Say 'Web app: standalone'
+  Write-Host "  the chat's app is the project's files served as they are, at http://<project>.localhost:<port>/:"
+  Write-Host '  HTML, CSS and JavaScript in the browser, nothing run on this machine - no Docker, no octopod'
+  Write-Host '  (for an app in containers, with a dev server and databases: bushwhack mode octopod)'
+} else {
+  Say 'Web app tools (optional)'
+  if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    Warn 'Docker is not installed: the chat will get the file and secret tools only (.\setup.ps1 -Standalone: its files served as a site instead)'
+  } elseif (-not $(docker compose version 2>$null | Out-Null; $LASTEXITCODE -eq 0)) {
+    Warn 'Docker Compose v2 (docker compose) is missing: the app tools need it'
+  } elseif (-not $(docker info 2>$null | Out-Null; $LASTEXITCODE -eq 0)) {
+    Warn 'Docker does not answer: start Docker Desktop, then run this again (the app tools need it)'
+  } elseif ($env:BUSHWHACK_OCTOPOD -or (Get-Command octopod -ErrorAction SilentlyContinue)) {
+    $octopod = if ($env:BUSHWHACK_OCTOPOD) { $env:BUSHWHACK_OCTOPOD } else { (Get-Command octopod).Source }
+    # The contract bushwhack speaks (OCTOPOD_CONTRACT in packages/daemon/src/octopod-client.ts).
+    $said = try { & $octopod version --json 2>$null | Out-String } catch { '' }
+    $v = try { $said | ConvertFrom-Json } catch { $null }
+    if (-not $v -or -not $v.contract) {
+      Warn "octopod at $octopod does not answer ``octopod version`` (older than 0.1, or a broken install): npm i -g @quazardous/octopod - the app tools stay off until then"
+    } elseif ("$($v.contract)" -eq '1') {
+      Write-Host "  octopod: $octopod ($($v.version), contract 1)"
+      # Contract 1 since 0.1, but Windows works from 0.3: docker compose was not found before.
+      $mm = "$($v.version)" -split '[.-]'
+      if ([int]$mm[0] -eq 0 -and [int]$mm[1] -lt 3) {
+        Warn "octopod $($v.version) predates its Windows fixes (0.3): update it (npm i -g @quazardous/octopod, or git pull and .\setup.ps1 in its clone)"
+      }
+    } else {
+      Warn "octopod at $octopod speaks contract $($v.contract), this bushwhack contract 1: update the older of the two"
     }
   } else {
-    Warn "octopod at $octopod speaks contract $($v.contract), this bushwhack contract 1: update the older of the two"
+    Warn 'octopod is not on your PATH (nor BUSHWHACK_OCTOPOD set): the app tools stay off until it is'
+    Write-Host '  to install it:  npm i -g @quazardous/octopod; octopod setup   (0.3 or later; not `octopod` alone: another project on npm)'
+    Write-Host '  or from a clone, with its tray in the Start menu:  git clone https://github.com/quazardous/octopod, then .\setup.ps1 in it'
   }
-} else {
-  Warn 'octopod is not on your PATH (nor BUSHWHACK_OCTOPOD set): the app tools stay off until it is'
-  Write-Host '  to install it:  npm i -g @quazardous/octopod; octopod setup   (0.3 or later; not `octopod` alone: another project on npm)'
-  Write-Host '  or from a clone, with its tray in the Start menu:  git clone https://github.com/quazardous/octopod, then .\setup.ps1 in it'
 }
 
 if ($Dev) {

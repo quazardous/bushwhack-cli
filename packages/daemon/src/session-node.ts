@@ -31,6 +31,8 @@ import type { OctopodCheck, OctopodClient } from './octopod-client.js';
 import { Dispatcher, type Approver, type ToolHost } from './dispatcher.js';
 import { describeSession, ensureStateDir, type SessionInfo } from './session.js';
 import { CallStore } from './store.js';
+import type { ProjectSites } from './site.js';
+import type { ToolSpec } from '@bushwhack/protocol';
 
 /** One request may carry this many calls; a turn holding more is a runaway, not a plan. */
 const MAX_CALLS_PER_REQUEST = 20;
@@ -82,6 +84,31 @@ export interface SessionOptions {
   browser?: () => string | undefined;
   /** The app's addresses changed: created, restarted, destroyed. */
   onApp?: (urls: string[]) => void;
+  /**
+   * Standalone mode (chosen at setup): the project's files served as they are, instead of
+   * an app through octopod — which is then not asked at all.
+   */
+  sites?: ProjectSites;
+}
+
+/**
+ * page:* in standalone mode: the same tools, and what the model is told the site is — its
+ * files as they are, nothing running them on the machine — so it builds what can work there.
+ */
+export function siteTools(url: string): ToolSpec[] {
+  return PAGE_TOOLS.map((spec) =>
+    spec.name !== 'page:open'
+      ? spec
+      : {
+          ...spec,
+          notes: [
+            `The app is the project's files as they are, served at ${url} — a path is a file of the project (a folder serves its index.html). Nothing runs them on the machine: no npm run dev, no build, no server code, no database server. There are no app:* tools.`,
+            'Build what works in the browser alone: HTML, CSS and JavaScript (ES modules; a library as a file of the project, or from a CDN). Keep data in the page — localStorage or IndexedDB, or SQLite in the page through WebAssembly (sql.js or wa-sqlite, its .wasm a file of the project), a starting .db file loaded with fetch.',
+            'After writing a file, page:open again to load it: the site sends every file fresh.',
+            ...(spec.notes ?? []),
+          ],
+        },
+  );
 }
 
 export interface OpenSession {
@@ -107,22 +134,27 @@ export async function openSession(options: SessionOptions): Promise<OpenSession>
   const { workspace, session } = await prepareSession(options.folder, options.env);
   const store = await CallStore.open(join(session.stateDir, 'calls.jsonl'));
 
-  // The web app, when octopod (and so docker) is there to run it: its app recipes are the stacks.
-  const checked: OctopodCheck = octopod.check
-    ? await octopod.check()
-    : (await octopod.available())
-      ? { ok: true, version: '?' }
-      : { ok: false, why: 'octopod not found or not answering' };
+  // Standalone: the project's own site, and octopod left alone. Otherwise the web app, when
+  // octopod (and so docker) is there to run it: its app recipes are the stacks.
+  const siteUrl = options.sites?.add(session.name, workspace);
+  const checked: OctopodCheck = siteUrl
+    ? { ok: false, why: 'standalone' }
+    : octopod.check
+      ? await octopod.check()
+      : (await octopod.available())
+        ? { ok: true, version: '?' }
+        : { ok: false, why: 'octopod not found or not answering' };
   const recipes = checked.ok ? await octopod.recipes().catch(() => []) : [];
   const stacks = stacksOf(recipes);
   const databases = databasesOf(recipes);
   const app = stacks.length > 0 ? new AppHost(session, octopod, databases) : undefined;
   const approver = options.approver(workspace, (call) => (call.tool === 'app:create' && app ? app.preview(call.args as never) : undefined));
-  const tools = [...FS_TOOLS, ...IGNORE_TOOLS, ...SECRET_TOOLS, ...IMAGE_TOOLS, ...REPORT_TOOLS, ...(app ? [...appTools(stacks, databases), ...PAGE_TOOLS] : [])];
+  const tools = [...FS_TOOLS, ...IGNORE_TOOLS, ...SECRET_TOOLS, ...IMAGE_TOOLS, ...REPORT_TOOLS, ...(siteUrl ? siteTools(siteUrl) : app ? [...appTools(stacks, databases), ...PAGE_TOOLS] : [])];
 
   const node = new HubNode({ nodeId: session.nodeId, defaultScope: 'global' });
-  const page = app
-    ? new PageHost(session, async () => originsOf(await app.urls()), async (target, request) =>
+  const appUrls = async (): Promise<string[]> => (siteUrl ? [siteUrl] : app ? app.urls() : []);
+  const page = siteUrl || app
+    ? new PageHost(session, async () => originsOf(await appUrls()), async (target, request) =>
         (await node.request(PAGE_ACT, request, { target: target.endsWith('*') ? (options.browser?.() ?? target) : target, timeoutMs: PAGE_TIMEOUT_MS })).payload,
       )
     : undefined;
@@ -155,7 +187,9 @@ export async function openSession(options: SessionOptions): Promise<OpenSession>
             : runFsTool(workspace, call.tool, call.args, call.body),
     redactor,
   };
-  const appLine = app
+  const appLine = siteUrl
+    ? `standalone: the project's files as they are, at ${siteUrl} (nothing run on the machine)`
+    : app
     ? `${stacks.join(', ')} through octopod — http://${session.name}.localhost`
     : `unavailable — ${checked.ok ? `octopod ${checked.version} has no app recipe` : checked.why}: fs and secret tools only`;
   const dispatcher = new Dispatcher(host, store, approver, (line) => out(`  ${line}`));
@@ -223,8 +257,9 @@ export async function openSession(options: SessionOptions): Promise<OpenSession>
     session,
     workspace,
     appLine,
-    appUrls: () => (app ? app.urls().catch(() => []) : Promise.resolve([])),
+    appUrls: () => appUrls().catch(() => []),
     close() {
+      options.sites?.remove(session.name);
       transport.disconnect();
     },
   };

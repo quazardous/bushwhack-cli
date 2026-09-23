@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A minimal install, without Docker or octopod: `./setup.sh --standalone` (`.\setup.ps1 -Standalone` on Windows). The chat's app is then the project's own files, served as they are at `http://<project>.localhost:47320/`, and the `page:*` tools look at it. Nothing of the project runs on the machine, and only what `fs:read` reads is served — never `.git/`, `.bushwhack/`, an ignored file or a declared secret file. The chat is told to build what works in the browser alone (its data in the page: localStorage, IndexedDB, or SQLite through WebAssembly). Chosen at setup, never a fallback: `bushwhack mode` says the mode, `bushwhack mode octopod|standalone` changes it.
 - Windows: `setup.ps1` sets bushwhack up in PowerShell — dependencies, the extension, the `bushwhack` command on the PATH (PowerShell, cmd and Git Bash). The service runs as a background process; the app tools work with Docker Desktop and an octopod that has its Windows fixes.
 
 ### Fixed

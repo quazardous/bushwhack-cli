@@ -18,9 +18,10 @@ import { AlreadyServing, serve, VERSION } from './serve.js';
 import { describeSession, readEndpoint } from './session.js';
 import { readHidden } from './approval.js';
 import { DEFAULT_INSTANCE, INSTANCE_NAME, listInstances, startService, SERVICE, SERVICE_NODE, type ProjectEntry, type ServiceFile } from './service.js';
-import { ensureService, operatorClient } from './service-client.js';
+import { answers, ensureService, operatorClient } from './service-client.js';
 import { runChatOnce, runChatTerminal, styleFor } from './chat-terminal.js';
 import { listReports, markReport, type ListedReport } from './reports.js';
+import { APP_MODES, configFile, readMode, writeMode, type AppMode } from './mode.js';
 
 const USAGE = `bushwhack ${VERSION}
 
@@ -44,6 +45,11 @@ const USAGE = `bushwhack ${VERSION}
   --yolo                           say yes to approvals by itself: with bushwhack, its project's;
                                    with bushwhack approvals, every project's (secret values are
                                    still typed by you)
+
+  bushwhack mode [octopod|standalone]
+                                   how a project gets its web app: through octopod (the app in
+                                   its containers), or standalone (its files served as they are,
+                                   nothing run) — set by setup; changing it restarts the service
 
   bushwhack serve [--new-code]     serve this folder alone, in this terminal
   bushwhack tools                  print the manifest the chat is given
@@ -134,6 +140,33 @@ async function runList(): Promise<void> {
     const { projects, code } = (await client.list()) as { projects: ProjectEntry[]; code: string };
     printProjects(projects, code);
   });
+}
+
+/**
+ * `bushwhack mode`: say it; `bushwhack mode <mode>`: write it, and stop the running
+ * services, which read it when they start — the next bushwhack command starts them again.
+ */
+async function runMode(rest: string[]): Promise<void> {
+  const wanted = rest[0];
+  if (wanted === undefined) {
+    const mode = await readMode();
+    console.log(`  ${mode}${mode === 'standalone' ? ": the projects' files served as they are, nothing run — no octopod" : ': the app through octopod, in its containers'}  (${configFile()})`);
+    return;
+  }
+  if (!APP_MODES.includes(wanted as AppMode)) throw new Error(`the mode is ${APP_MODES.join(' or ')}, not "${wanted}"`);
+  await writeMode(wanted as AppMode);
+  console.log(`  mode: ${wanted}  (${configFile()})`);
+  for (const instance of await listInstances()) {
+    const pid = instance.file?.pid;
+    // Only a service that answers as itself: the pid of one that stopped may be another process's now.
+    if (!pid || !(await answers(instance.file))) continue;
+    try {
+      process.kill(pid, 'SIGTERM');
+      console.log(`  the ${instance.name} service stopped: the next bushwhack command starts it in this mode`);
+    } catch {
+      // not running
+    }
+  }
 }
 
 async function runDaemon(): Promise<void> {
@@ -428,6 +461,8 @@ async function main(argv: string[]): Promise<void> {
       return runCall(rest);
     case 'tools':
       return runTools();
+    case 'mode':
+      return runMode(rest);
     case 'version':
     case '--version':
       process.stdout.write(`bushwhack ${VERSION}\n`);

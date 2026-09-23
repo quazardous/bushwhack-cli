@@ -52,7 +52,8 @@ export function unitFile(bin: string, env: NodeJS.ProcessEnv = process.env, inst
   return lines.join('\n');
 }
 
-async function answers(file: ServiceFile | undefined): Promise<boolean> {
+/** Whether the service of this file answers on its port, as itself: not another process since. */
+export async function answers(file: ServiceFile | undefined): Promise<boolean> {
   if (!file?.port) return false;
   try {
     const response = await fetch(`http://127.0.0.1:${file.port}/health`, { signal: AbortSignal.timeout(500) });

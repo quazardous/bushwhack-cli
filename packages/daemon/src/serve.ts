@@ -11,6 +11,8 @@ import { TerminalApprover } from './approval.js';
 import type { Approver } from './dispatcher.js';
 import { loadPairingCode, writeEndpoint, type SessionInfo } from './session.js';
 import { openSession, prepareSession } from './session-node.js';
+import { readMode } from './mode.js';
+import { ProjectSites } from './site.js';
 
 import { VERSION } from './version.js';
 
@@ -25,6 +27,8 @@ export interface ServeOptions {
   ports?: number[];
   out?: (line: string) => void;
   env?: NodeJS.ProcessEnv;
+  /** Standalone mode: the ports to try for the project's site; the mode itself is read from the config. */
+  sitePorts?: number[];
   /** How the app:* tools reach octopod; its CLI by default. Tools are offered only if it answers. */
   octopod?: OctopodClient;
 }
@@ -72,9 +76,11 @@ export async function serve(options: ServeOptions): Promise<Serving> {
   const code = await loadPairingCode(session, options.rotateCode ?? false);
   const health: SessionHealth = { service: 'bushwhack', session: session.name, folder: session.folder, nodeId: session.nodeId };
   const { relay, port } = await listenRelay({ ports: options.ports, code, logDir: join(session.stateDir, 'logs'), health: { ...health }, folder: session.folder });
+  const sites = (await readMode(options.env)) === 'standalone' ? await ProjectSites.listen(options.sitePorts) : undefined;
   const opened = await openSession({
     folder: options.folder,
     relay: { port, code },
+    sites,
     approver: (workspace, preview) => options.approver ?? new TerminalApprover(workspace, process.stdin, process.stdout, preview as never),
     octopod: options.octopod ?? octopodCli(),
     env: options.env,
@@ -88,6 +94,7 @@ export async function serve(options: ServeOptions): Promise<Serving> {
     code,
     async close() {
       opened.close();
+      await sites?.close();
       await relay.close();
     },
   };

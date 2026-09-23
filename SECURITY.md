@@ -22,6 +22,11 @@ the tools let through. The full design is in [ARCHITECTURE.md](./ARCHITECTURE.md
   without `.bushwhack/`, `.git/` read-only, capabilities dropped, no internet unless you
   approved it at creation. The model can only look at that app's pages, in a tab the
   extension opens for it — never at any other site.
+- **Standalone, nothing runs.** Installed `--standalone`, there is no app to box: bushwhack
+  serves the project's files as they are (GET only, to its own `<project>.localhost` name,
+  on `127.0.0.1`) and runs none of them. What it serves is what `fs:read` reads — never
+  `.git/`, `.bushwhack/`, an ignored file or a declared secret file. The page's JavaScript
+  runs in your browser, in the app's tab, like any site's.
 - **Prompt injection is expected.** A file, a log or a page the model reads may try to make
   it call a tool. The limits above hold whatever it is told.
 

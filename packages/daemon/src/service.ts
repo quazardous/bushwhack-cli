@@ -21,6 +21,8 @@ import { octopodCli, type OctopodClient } from './octopod-client.js';
 import { listenRelay } from './serve.js';
 import { describeSession, newPairingCode } from './session.js';
 import { openSession, type OpenSession } from './session-node.js';
+import { readMode } from './mode.js';
+import { ProjectSites } from './site.js';
 import type { Workspace } from '@bushwhack/workspace';
 
 /** The service's own node on its relay: where the CLI and the approvals client talk to it. */
@@ -118,6 +120,8 @@ export interface ServiceOptions {
   env?: NodeJS.ProcessEnv;
   out?: (line: string) => void;
   approvalWaitMs?: number;
+  /** Standalone mode: the ports to try for the projects' sites; the mode itself is read from the config. */
+  sitePorts?: number[];
 }
 
 export interface ProjectEntry {
@@ -226,6 +230,9 @@ export async function startService(options: ServiceOptions = {}): Promise<Servic
   const sessions: ProjectEntry[] = [];
   const health: SessionHealth & { daemon: string; instance: string } = { service: 'bushwhack', daemon: file.id, instance, sessions };
   const { relay, port }: { relay: RelayServer; port: number } = await listenRelay({ ports: options.ports, code: file.code, logDir: join(dir, 'logs'), health: health as unknown as Record<string, unknown> });
+  // Standalone (chosen at setup): one server for every project's site.
+  const sites = (await readMode(options.env)) === 'standalone' ? await ProjectSites.listen(options.sitePorts) : undefined;
+  if (sites) out(`  standalone: the projects' sites on 127.0.0.1:${sites.port} (http://<project>.localhost:${sites.port}/)`);
   await writeServiceFile(dir, { ...file, port, pid: process.pid });
 
   const node = new HubNode({ nodeId: SERVICE_NODE, defaultScope: 'global' });
@@ -327,6 +334,7 @@ export async function startService(options: ServiceOptions = {}): Promise<Servic
       octopod,
       env: options.env,
       out,
+      sites,
       onApp: (urls) => setUrl(describeSession(root).nodeId, urls),
     });
     open.set(session.session.folder, session);
@@ -487,6 +495,7 @@ export async function startService(options: ServiceOptions = {}): Promise<Servic
     list: () => [...sessions],
     async close() {
       for (const s of open.values()) s.close();
+      await sites?.close();
       transport.disconnect();
       await relay.close();
     },

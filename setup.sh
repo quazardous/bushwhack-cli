@@ -4,18 +4,23 @@
 #
 #   ./setup.sh                 # links the command into ~/.local/bin
 #   ./setup.sh --dev           # the same, for development: no production extension build
+#   ./setup.sh --standalone    # a minimal install: no Docker, no octopod — the chat's app is
+#                              # the project's files served as they are, nothing run
 #   BIN_DIR=~/bin ./setup.sh   # … or elsewhere
 #
 # The command is a link to bin/bushwhack, which runs the sources: a change to the code
 # needs no new setup, only a restart of what runs it. Run it again after a dependency
-# change.
+# change. The mode (standalone or octopod) is kept across runs: `bushwhack mode` says it and
+# changes it.
 set -euo pipefail
 
 DEV=0
+STANDALONE=0
 for arg in "$@"; do
   case "$arg" in
     --dev) DEV=1 ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    --standalone) STANDALONE=1 ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -59,24 +64,34 @@ case ":$PATH:" in
   *) warn "$BIN_DIR is not on your PATH: add  export PATH=\"$BIN_DIR:\$PATH\"  to your shell's profile" ;;
 esac
 
-say "Web app tools (optional)"
-if ! command -v docker >/dev/null; then
-  warn "Docker is not installed: the chat will get the file and secret tools only"
-elif ! docker compose version >/dev/null 2>&1; then
-  warn "Docker Compose v2 (docker compose) is missing: the app tools need it"
-elif [ -n "${BUSHWHACK_OCTOPOD:-}" ] || command -v octopod >/dev/null; then
-  OCTOPOD="${BUSHWHACK_OCTOPOD:-$(command -v octopod)}"
-  # The contract bushwhack speaks (OCTOPOD_CONTRACT in packages/daemon/src/octopod-client.ts).
-  said="$("$OCTOPOD" version --json 2>/dev/null || true)"
-  contract="$(printf '%s' "$said" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const v=JSON.parse(s);console.log(v.contract+" "+v.version)}catch{console.log("none")}})')"
-  case "$contract" in
-    "1 "*) echo "  octopod: $OCTOPOD (${contract#* }, contract 1)" ;;
-    none)  warn "octopod at $OCTOPOD does not answer \`octopod version\` (older than 0.1, or a broken install): npm i -g @quazardous/octopod — the app tools stay off until then" ;;
-    *)     warn "octopod at $OCTOPOD speaks contract ${contract%% *}, this bushwhack contract 1: update the older of the two" ;;
-  esac
+[ "$STANDALONE" = 1 ] && "$ROOT/bin/bushwhack" mode standalone >/dev/null
+MODE="$("$ROOT/bin/bushwhack" mode | awk '{print $1}')"
+
+if [ "$MODE" = standalone ]; then
+  say "Web app: standalone"
+  echo "  the chat's app is the project's files served as they are, at http://<project>.localhost:<port>/:"
+  echo "  HTML, CSS and JavaScript in the browser, nothing run on this machine — no Docker, no octopod"
+  echo "  (for an app in containers, with a dev server and databases: bushwhack mode octopod)"
 else
-  warn "octopod is not on your PATH (nor BUSHWHACK_OCTOPOD set): the app tools stay off until it is"
-  echo "  to install it:  npm i -g @quazardous/octopod && octopod setup   (not \`octopod\` alone: another project on npm)"
+  say "Web app tools (optional)"
+  if ! command -v docker >/dev/null; then
+    warn "Docker is not installed: the chat will get the file and secret tools only (./setup.sh --standalone: its files served as a site instead)"
+  elif ! docker compose version >/dev/null 2>&1; then
+    warn "Docker Compose v2 (docker compose) is missing: the app tools need it"
+  elif [ -n "${BUSHWHACK_OCTOPOD:-}" ] || command -v octopod >/dev/null; then
+    OCTOPOD="${BUSHWHACK_OCTOPOD:-$(command -v octopod)}"
+    # The contract bushwhack speaks (OCTOPOD_CONTRACT in packages/daemon/src/octopod-client.ts).
+    said="$("$OCTOPOD" version --json 2>/dev/null || true)"
+    contract="$(printf '%s' "$said" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const v=JSON.parse(s);console.log(v.contract+" "+v.version)}catch{console.log("none")}})')"
+    case "$contract" in
+      "1 "*) echo "  octopod: $OCTOPOD (${contract#* }, contract 1)" ;;
+      none)  warn "octopod at $OCTOPOD does not answer \`octopod version\` (older than 0.1, or a broken install): npm i -g @quazardous/octopod — the app tools stay off until then" ;;
+      *)     warn "octopod at $OCTOPOD speaks contract ${contract%% *}, this bushwhack contract 1: update the older of the two" ;;
+    esac
+  else
+    warn "octopod is not on your PATH (nor BUSHWHACK_OCTOPOD set): the app tools stay off until it is"
+    echo "  to install it:  npm i -g @quazardous/octopod && octopod setup   (not \`octopod\` alone: another project on npm)"
+  fi
 fi
 
 if [ "$DEV" = 1 ]; then

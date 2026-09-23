@@ -41,6 +41,25 @@ by their variables' names. Run `./setup.sh` (`.\setup.ps1` on Windows) in
 bushwhack again afterwards to check it is seen. Without it, the chat gets
 the file and secret tools only.
 
+### Or a minimal install: standalone
+
+Without Docker or octopod, a chat can still build a site it looks at:
+
+```sh
+./setup.sh --standalone          # .\setup.ps1 -Standalone on Windows
+```
+
+The project's files are then served as they are at `http://<project>.localhost:47320/`
+(`bushwhack list` gives the address), and the `page:*` tools open, read, click and
+screenshot them. Nothing of the project runs on your machine: no dev server, no build, no
+back-end, no `app:*` tools — HTML, CSS and JavaScript in the browser, their data in the page
+(localStorage, IndexedDB, or SQLite through WebAssembly), which is what the chat is told to
+build. `.git/`, `.bushwhack/`, ignored files and declared secret files are not served.
+
+The mode stays across setups. `bushwhack mode` says it; `bushwhack mode octopod` goes back
+to the app in containers (install octopod first), `bushwhack mode standalone` the other way
+— either restarts the service.
+
 ## 2. Add a project
 
 In the folder the chat should work on:

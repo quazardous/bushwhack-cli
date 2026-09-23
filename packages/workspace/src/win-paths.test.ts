@@ -53,7 +53,9 @@ describe('the jail', () => {
     expect((await ws.read('readme.md', 1, 10)).text).toContain('# hi');
   });
 
-  it('elsewhere, those names are plain names', async () => {
+  // Only where the file system agrees: on NTFS itself, `notes.txt:v2` is a stream whatever
+  // the jail says, and writing it fails.
+  it.skipIf(process.platform === 'win32')('elsewhere, those names are plain names', async () => {
     const ws = await Workspace.open(root, { platform: 'linux' });
     await expect(ws.write('notes.txt:v2', 'x')).resolves.toMatchObject({ created: true });
   });

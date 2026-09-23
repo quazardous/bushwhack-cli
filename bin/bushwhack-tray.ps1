@@ -92,6 +92,26 @@ function Open-Terminal([string]$folder, [string]$what) {
     }
 }
 
+# --- the mode ---------------------------------------------------------------------------
+# Read where bushwhack writes it, so it is known with the service stopped too.
+$configFile = if ($env:XDG_CONFIG_HOME) { Join-Path $env:XDG_CONFIG_HOME 'bushwhack\config.json' } else { Join-Path $env:USERPROFILE '.config\bushwhack\config.json' }
+function Get-Mode {
+    try { if ((Get-Content -Raw $configFile | ConvertFrom-Json).mode -eq 'standalone') { return 'standalone' } } catch { }
+    return 'octopod'
+}
+function Test-Octopod {
+    return [bool]($env:BUSHWHACK_OCTOPOD -or (Get-Command octopod -ErrorAction SilentlyContinue))
+}
+# Asked first -- the service restarts. Then `bushwhack mode <mode>` (which stops it), and,
+# once that is done, `bushwhack list` starts it again in the new mode.
+$script:switching = $null
+function Switch-Mode([string]$mode) {
+    $answer = [System.Windows.Forms.MessageBox]::Show((Get-ModeQuestion $mode), 'bushwhack', 'YesNo', 'Question')
+    if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+    $script:switching = @{ mode = $mode; command = (Start-Bushwhack @('mode', $mode)) }
+    $ni.ShowBalloonTip(3000, 'bushwhack', "Switching to $mode mode...", [System.Windows.Forms.ToolTipIcon]::None)
+}
+
 # --- autostart: a Run value, the one Settings > Apps > Startup shows and can turn off --
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $runName = 'bushwhack-tray'
@@ -161,6 +181,12 @@ function Build-Menu {
     } elseif ($script:look) {
         Add-Item $menu.Items 'Start the service' { $script:starting = Start-Bushwhack @('list'); $ni.ShowBalloonTip(3000, 'bushwhack', 'Starting the service...', [System.Windows.Forms.ToolTipIcon]::None) } | Out-Null
     }
+    # The mode, switched from here: what `bushwhack mode <mode>` does, then the service started again.
+    $modes = Add-Item $menu.Items "Mode: $(Get-Mode)" { }
+    foreach ($choice in Get-ModeChoices (Get-Mode) (Test-Octopod)) {
+        $item = if ($choice.enabled) { Add-Item $modes.DropDownItems $choice.label { Switch-Mode $this.Tag } $choice.mode } else { Add-Item $modes.DropDownItems $choice.label $null }
+        $item.Checked = $choice.checked
+    }
     $menu.Items.Add('-') | Out-Null
     $auto = Add-Item $menu.Items 'Start with Windows' { Set-Autostart (-not (Test-Autostart)) }
     $auto.Checked = Test-Autostart
@@ -219,6 +245,19 @@ $script:ticks = 0
 function Update-Tray {
     if ($script:quitting) { return }
     if ($quitSignal.WaitOne(0)) { Exit-Tray; return }
+    if ($script:switching) {
+        $m = Receive-Command $script:switching.command
+        if ($m) {
+            $mode = $script:switching.mode
+            $script:switching = $null
+            if ($m.code -eq 0) {
+                $script:starting = Start-Bushwhack @('list')
+                $ni.ShowBalloonTip(5000, 'bushwhack', "Now in $mode mode: the service starts again. Give each chat the tools manifest again.", [System.Windows.Forms.ToolTipIcon]::Info)
+            } else {
+                $ni.ShowBalloonTip(8000, 'bushwhack', "The switch to $mode mode failed: $(($m.err -split "`n")[0])", [System.Windows.Forms.ToolTipIcon]::Warning)
+            }
+        }
+    }
     if ($script:starting) {
         $s = Receive-Command $script:starting
         if ($s) { $script:starting = $null; $script:ticks = 0 }

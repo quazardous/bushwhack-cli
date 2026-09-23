@@ -41,6 +41,17 @@ describe('the Windows tray', () => {
     expect(pwsh(`(Get-TrayLook ('{"projects":[],"browsers":[]}' | ConvertFrom-Json)).line`)).toBe('0 projects - no chat open, no browser paired');
   });
 
+  it.skipIf(!hasPwsh)('offers the other mode only, and octopod only when it is installed', { timeout: 20_000 }, () => {
+    type Choice = { mode: string; checked: boolean; enabled: boolean; label: string };
+    const choices = (current: string, found: string): Choice[] => pwsh(`Get-ModeChoices '${current}' $${found}`) as Choice[];
+    expect(choices('standalone', 'true').map((c) => [c.mode, c.checked, c.enabled])).toEqual([['standalone', true, false], ['octopod', false, true]]);
+    expect(choices('octopod', 'true').map((c) => [c.mode, c.checked, c.enabled])).toEqual([['standalone', false, true], ['octopod', true, false]]);
+    const missing = choices('standalone', 'false')[1];
+    expect([missing.enabled, missing.label]).toEqual([false, 'octopod - not installed (npm i -g @quazardous/octopod)']);
+    // Asked before: the service restarts, and the chats need the manifest again.
+    expect(pwsh(`Get-ModeQuestion 'octopod'`)).toMatch(/restarts[\s\S]*manifest again/);
+  });
+
   it.skipIf(!hasPwsh)('names each project with the chat it is live in, and says when the service stops or comes back', { timeout: 20_000 }, () => {
     expect(pwsh(`('${list}' | ConvertFrom-Json).projects | ForEach-Object { Get-ProjectLabel $_ }`)).toEqual(['shop - live in Gemini', 'blog - no chat open']);
     expect(pwsh(`Get-TrayNews @{ up = $true } @{ up = $false }`)).toBe('The bushwhack service stopped');

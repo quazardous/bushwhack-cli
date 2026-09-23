@@ -46,3 +46,19 @@ function Get-TrayNews($before, $after) {
     if (-not $before.up -and $after.up) { return 'The bushwhack service is back' }
     return $null
 }
+
+# The Mode submenu: the two modes, the current one checked; octopod only when it is there
+# to run the apps. $current: 'standalone' or 'octopod' (what `bushwhack mode` wrote).
+function Get-ModeChoices([string]$current, [bool]$octopodFound) {
+    $octopodLabel = if ($octopodFound) { 'octopod - the app in its containers' } else { 'octopod - not installed (npm i -g @quazardous/octopod)' }
+    return @(
+        @{ mode = 'standalone'; label = "Standalone - the project's files, nothing run"; checked = ($current -eq 'standalone'); enabled = ($current -ne 'standalone') }
+        @{ mode = 'octopod'; label = $octopodLabel; checked = ($current -ne 'standalone'); enabled = ($current -eq 'standalone' -and $octopodFound) }
+    )
+}
+
+# What to ask before switching: the service restarts, and what that cuts.
+function Get-ModeQuestion([string]$mode) {
+    $what = if ($mode -eq 'standalone') { "each project's files served as they are, nothing run - no app:* tools" } else { 'the app in its containers, through octopod and Docker' }
+    return "Switch bushwhack to $mode mode ($what)?`r`n`r`nThe service restarts: the chats reconnect by themselves, and a call running now is cut (the chat can send it again). Give each chat the tools manifest again: the tools change."
+}

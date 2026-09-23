@@ -6,6 +6,8 @@
  * The binary is `octopod` on the PATH, or whatever BUSHWHACK_OCTOPOD names.
  */
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { delimiter, dirname, isAbsolute, join } from 'node:path';
 
 export interface OctopodRoute {
   service: string;
@@ -84,10 +86,37 @@ export class OctopodError extends Error {
   code?: string;
 }
 
+/**
+ * What to start for `binary`: a script is run by this node. On Windows the command on the
+ * PATH is a `.cmd` shim, which only a shell runs — and a shell would re-read the arguments:
+ * the script the shim starts is run instead, read from npm's shim or from octopod's own
+ * (`rem entry <script>`).
+ */
+export function octopodCommand(binary: string, env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): [string, string[]] {
+  if (/\.m?js$/i.test(binary)) return [process.execPath, [binary]];
+  if (platform !== 'win32' || /\.exe$/i.test(binary)) return [binary, []];
+  const pathVar = Object.entries(env).find(([k]) => k.toUpperCase() === 'PATH')?.[1] ?? '';
+  const shims = /\.cmd$/i.test(binary) ? [binary] : isAbsolute(binary) ? [`${binary}.cmd`] : pathVar.split(delimiter).filter(Boolean).map((d) => join(d, `${binary}.cmd`));
+  for (const shim of shims) {
+    let text: string;
+    try {
+      text = readFileSync(shim, 'utf8');
+    } catch {
+      continue;
+    }
+    const own = /^rem entry (.+\.m?js)\s*$/im.exec(text)?.[1];
+    if (own) return [process.execPath, [own.trim()]];
+    const npm = /"%(?:~)?dp0%?\\([^"]+\.m?js)"/i.exec(text)?.[1];
+    if (npm) return [process.execPath, [join(dirname(shim), npm)]];
+  }
+  return [binary, []];
+}
+
 export function octopodCli(binary = process.env.BUSHWHACK_OCTOPOD || 'octopod', env: NodeJS.ProcessEnv = process.env): OctopodClient {
   const run = (args: string[], timeoutMs = 5 * 60_000): Promise<unknown> =>
     new Promise((resolve, reject) => {
-      execFile(binary, [...args, '--json'], { env, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 }, (error, stdout, stderr) => {
+      const [command, before] = octopodCommand(binary, env);
+      execFile(command, [...before, ...args, '--json'], { env, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024, windowsHide: true }, (error, stdout, stderr) => {
         if (error) {
           const failed = new OctopodError((stderr || error.message).trim().replace(/^octopod: /, ''));
           if (typeof (error as NodeJS.ErrnoException).code === 'string') failed.code = (error as NodeJS.ErrnoException).code;

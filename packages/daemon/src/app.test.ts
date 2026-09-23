@@ -122,7 +122,7 @@ describe('app tools', () => {
     const policy = JSON.parse(await readFile(join(dir, 'policy.json'), 'utf8'));
     expect(policy.services.app.volumes).toEqual([
       { type: 'tmpfs', target: '/app/.bushwhack', read_only: true, tmpfs: { size: 4096 } },
-      `${folder}/.git:/app/.git:ro`,
+      `${join(folder, '.git')}:/app/.git:ro`,
     ]);
     expect(policy.services.app.cap_drop).toEqual(['ALL']);
     expect(policy.services.app.security_opt).toEqual(['no-new-privileges:true']);

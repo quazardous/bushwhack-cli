@@ -14,7 +14,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connectBridge, type BridgeClient } from './bridge-client.js';
 import type { Approver } from './dispatcher.js';
-import { octopodCli } from './octopod-client.js';
+import { octopodCli, octopodCommand } from './octopod-client.js';
 import { serve, type Serving } from './serve.js';
 
 const OCTOPOD_BIN = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../octopod/bin');
@@ -78,7 +78,8 @@ describe.skipIf(!dockerAvailable() || !existsSync(OCTOPOD))('the app, for real (
     bridge?.close();
     await serving?.close();
     try {
-      execFileSync(OCTOPOD, ['edge', 'down'], { env, stdio: 'ignore' });
+      const [command, before] = octopodCommand(OCTOPOD, env);
+      execFileSync(command, [...before, 'edge', 'down'], { env, stdio: 'ignore' });
     } catch {
       // nothing up
     }
@@ -110,7 +111,9 @@ describe.skipIf(!dockerAvailable() || !existsSync(OCTOPOD))('the app, for real (
 
   it('writes the project files as the operator', async () => {
     await run('app:exec', { command: 'touch /app/made-by-the-app' });
-    expect((await stat(join(folder, 'made-by-the-app'))).uid).toBe(process.getuid?.());
+    const made = await stat(join(folder, 'made-by-the-app'));
+    // Windows has no uids: that it reached the project is what can be checked there.
+    if (process.platform !== 'win32') expect(made.uid).toBe(process.getuid?.());
   });
 
   it('has no way out to the internet unless the operator approved one', async () => {

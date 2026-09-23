@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Windows: `setup.ps1` sets bushwhack up in PowerShell — dependencies, the extension, the `bushwhack` command on the PATH (PowerShell, cmd and Git Bash). The service runs as a background process; the app tools work with Docker Desktop and an octopod that has its Windows fixes.
+
+### Fixed
+
+- Windows: the service could not start (it was launched through a bash script), and octopod was never found (npm installs it as a `.cmd`, which cannot be run without a shell): both are now started through node.
+
 ## [0.1.0] - 2026-09-23
 
 First public release.

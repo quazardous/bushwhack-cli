@@ -85,7 +85,13 @@ export async function startServiceProcess(dir: string, env: NodeJS.ProcessEnv = 
   }
   await mkdir(dir, { recursive: true, mode: 0o700 });
   const log = openSync(join(dir, 'service.log'), 'a');
-  const child = spawn(BUSHWHACK_BIN, ['daemon', '--instance', instance], { detached: true, stdio: ['ignore', log, log], env });
+  // Windows cannot run bin/bushwhack (a bash script): node runs the CLI itself, with the
+  // flags this process was started with (the export condition, tsx).
+  const [command, args] =
+    process.platform === 'win32'
+      ? [process.execPath, [...process.execArgv, fileURLToPath(new URL('./cli.ts', import.meta.url)), 'daemon', '--instance', instance]]
+      : [BUSHWHACK_BIN, ['daemon', '--instance', instance]];
+  const child = spawn(command, args, { detached: true, stdio: ['ignore', log, log], env, windowsHide: true });
   child.unref();
   return `a background process (log: ${join(dir, 'service.log')})`;
 }

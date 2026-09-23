@@ -29,6 +29,9 @@ git clone https://github.com/quazardous/bushwhack-cli bushwhack && cd bushwhack
 ./setup.sh                 # dependencies, the extension, `bushwhack` on your PATH
 ```
 
+On Windows, run `.\setup.ps1` in PowerShell instead (the service then runs as a background
+process; the web app tools are untested there).
+
 Load the extension once: `chrome://extensions` → enable **Developer mode** → **Load
 unpacked** → pick `extension/dist`.
 

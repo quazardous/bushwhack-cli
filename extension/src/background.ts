@@ -30,6 +30,7 @@ import {
   type ToolsListReply,
 } from '@bushwhack/protocol';
 import {
+  DEFAULT_SETTINGS,
   DEV_CALL,
   type CallsResponse,
   type PictureResponse,
@@ -104,7 +105,7 @@ async function nextCallIdOf(conversation: string): Promise<number> {
   const key = `handled:${conversation}`;
   return nextCallId(((await chrome.storage.local.get(key))[key] as string[] | undefined) ?? []);
 }
-const settings = (): Promise<Settings> => load('settings', { autoSend: false });
+const settings = (): Promise<Settings> => load('settings', DEFAULT_SETTINGS);
 
 /** Who we are on a relay: which extension, which build — visible in the relay's /clients. */
 function identity(): Record<string, string> {

@@ -119,9 +119,9 @@ any other page, it opens in a tab of its own).
 4. Ask for what you want: "list the project", "add a README", …
 
 Calls run in order. Reads run at once; writes, edits, moves and deletes wait for `y` at
-`bushwhack approvals`, with a diff. Results come back into the message box — and are sent
-for you if **Send results automatically** is ticked. While you type in the chat, results
-wait a few seconds after your last key.
+`bushwhack approvals`, with a diff. Results come back into the message box and are sent for
+you — **Send results automatically**, ticked unless you untick it in the panel. While you
+type in the chat, results wait a few seconds after your last key.
 
 `bushwhack serve` is the older way: one folder, its approvals in its own terminal.
 

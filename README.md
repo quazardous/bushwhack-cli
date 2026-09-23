@@ -65,8 +65,9 @@ code**. Then, on a meta.ai, Gemini or ChatGPT conversation:
    Send it, then ask for what you want done.
 
 The model's calls run in order; approvals appear at `bushwhack approvals`, named after
-the project, with a diff for file writes. Results go back into the message box — sent
-automatically if you tick *Send results automatically* in the panel.
+the project, with a diff for file writes. Results go back into the message box and are
+sent by themselves (*Send results automatically*, in the panel: untick it to send them
+yourself).
 
 `bushwhack serve` still serves one folder alone, from its own terminal.
 

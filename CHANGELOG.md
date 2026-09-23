@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The panel's *Forget* is the service's, next to "this browser is paired", and asks first — in the panel, saying which service, how many projects go with it, and that their chats are unbound. It sat on every project, though it always forgot the whole service.
+- *Send results automatically* is ticked by default: results go back to the chat without a click per round. A browser where it was unticked keeps it unticked.
 - The panel's pairing code field stands out — larger, a halo until it is focused (steady under reduced motion) — takes the keyboard when nothing else has it, and pairs on Enter.
 
 ### Fixed

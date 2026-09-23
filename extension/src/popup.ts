@@ -6,7 +6,7 @@
  * It opens over a chat (the overlay's frame, `?tab=<the chat's tab>`) and acts on that
  * chat; or in a tab of its own, with no chat to act on.
  */
-import type { DiscoveredSession, Links, PopupRequest, Settings, TabInfo } from './messages.js';
+import { DEFAULT_SETTINGS, type DiscoveredSession, type Links, type PopupRequest, type Settings, type TabInfo } from './messages.js';
 import { PANEL_CLOSE } from './panel-overlay.js';
 import { reconcile, type ListContext } from './popup-list.js';
 
@@ -103,7 +103,7 @@ async function main(): Promise<void> {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closePanel();
   });
-  const stored = ((await chrome.storage.local.get('settings')).settings as Settings | undefined) ?? { autoSend: false };
+  const stored = ((await chrome.storage.local.get('settings')).settings as Settings | undefined) ?? DEFAULT_SETTINGS;
   const box = $('autosend') as HTMLInputElement;
   box.checked = stored.autoSend;
   box.onchange = () => void ask({ type: 'settings', autoSend: box.checked }).catch(fail);

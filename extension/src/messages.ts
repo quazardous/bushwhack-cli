@@ -131,3 +131,10 @@ export type StatusResponse = { bound: string | null; autoSend: boolean; elsewher
 export interface Settings {
   autoSend: boolean;
 }
+
+/**
+ * Until the operator changes them. Results are sent by themselves: the chat goes on without
+ * a click per round, and a result never waits unseen in the message box. Unticked, they
+ * wait there for the operator to send.
+ */
+export const DEFAULT_SETTINGS: Settings = { autoSend: true };

@@ -327,6 +327,15 @@ describe('the service', () => {
     expect(events).toEqual([]);
   });
 
+  it('does not take its own leaving for a lost service: closed, a terminal is told nothing', async () => {
+    const lost: string[] = [];
+    const terminal = await operatorClient((await readServiceFile(dir))!, 'approvals:leaving', { lost: () => lost.push('lost'), back: () => void lost.push('back') });
+    await terminal.approvalsHere();
+    terminal.close();
+    await new Promise((r) => setTimeout(r, 200));
+    expect(lost).toEqual([]);
+  });
+
   it('keeps a terminal through a restart of the service: it reconnects, and the approvals come back to it', async () => {
     const answered: string[] = [];
     let back: () => void = () => {};

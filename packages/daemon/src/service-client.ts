@@ -143,6 +143,7 @@ export async function operatorClient(file: ServiceFile, nodeId: string, keep?: K
   });
   node.addTransport(transport);
   await transport.connect();
+  let closed = false;
   if (keep) {
     let connected = true;
     // A service coming back listens before its own node is there and before its projects
@@ -158,7 +159,8 @@ export async function operatorClient(file: ServiceFile, nodeId: string, keep?: K
       }
     };
     transport.onStateChange((state) => {
-      if (state.connected === connected) return;
+      // Closed by this client: not lost, and nothing to take back.
+      if (closed || state.connected === connected) return;
       connected = state.connected;
       if (!connected) keep.lost?.();
       else void takeBack();
@@ -182,6 +184,9 @@ export async function operatorClient(file: ServiceFile, nodeId: string, keep?: K
     chatSend: (session: string, text: string) => ask(SERVICE.chatSend, { session, text }),
     /** Send the tools manifest to a project's chat, made by the extension for that chat. */
     chatManifest: (session: string) => ask(SERVICE.chatSend, { session, text: '', manifest: true }),
-    close: () => transport.disconnect(),
+    close: () => {
+      closed = true;
+      transport.disconnect();
+    },
   };
 }

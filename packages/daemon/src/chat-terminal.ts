@@ -234,8 +234,9 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
   };
   let suspended = false;
 
-  /** Print above the prompt, then give the prompt back. */
+  /** Print above the prompt, then give the prompt back — nothing once the terminal is left. */
   const say = (text: string): void => {
+    if (leaving) return;
     output.write(`\r\x1b[2K${text}\n`);
     if (busy) output.write(`${busyLine()}\n`);
     rl.prompt(true);

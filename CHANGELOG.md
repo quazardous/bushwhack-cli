@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Leaving a chat terminal no longer ends on an `ERR_USE_AFTER_CLOSE` stack trace: its own leaving was taken for a lost service, and it tried to say so on a prompt already closed.
 - Windows: the service could not start (it was launched through a bash script), and octopod was never found (npm installs it as a `.cmd`, which cannot be run without a shell): both are now started through node.
 
 ## [0.1.0] - 2026-09-23

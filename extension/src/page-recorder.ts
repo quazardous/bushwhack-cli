@@ -50,6 +50,19 @@
   };
 
   addEventListener('error', (e) => note('error', [e.message || 'error', e.filename ? `(${e.filename}:${e.lineno})` : '']));
+  // What the page loads itself — a <script src>, a stylesheet, an image — goes through no
+  // fetch: a missing file or an unreachable CDN is only an error event on its element, seen
+  // here in the capture phase (it does not bubble).
+  addEventListener(
+    'error',
+    (e) => {
+      const el = e.target as (Element & { src?: string; href?: string }) | null;
+      if (!el || el === (window as unknown) || !(el instanceof Element)) return;
+      const url = el.src || el.href || el.getAttribute('src') || el.getAttribute('href') || '';
+      note('error', [`failed to load <${el.tagName.toLowerCase()}> ${url}`]);
+    },
+    true,
+  );
   addEventListener('unhandledrejection', (e) => note('error', ['unhandled rejection:', e.reason]));
 
   const originalFetch = window.fetch.bind(window);

@@ -17,7 +17,7 @@ const selector = (description: string, required = true) =>
 export const PAGE_TOOLS: ToolSpec[] = [
   {
     name: 'page:open',
-    summary: 'Open the app in the browser (its own tab), at a path. Other page:* tools act on that tab.',
+    summary: 'Open the app in the browser (its own tab), at a path. Other page:* tools act on that tab. The result says how the load went: its console errors and failed requests (a script or stylesheet missing, a CDN unreachable), or that there were none.',
     approval: false,
     params: { path: { type: 'text', description: 'a path on the app, like /about?x=1', maxLength: 500, default: '/' } },
     notes: [

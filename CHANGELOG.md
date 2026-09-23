@@ -24,12 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A minimal install, without Docker or octopod: `./setup.sh --standalone` (`.\setup.ps1 -Standalone` on Windows). The chat's app is then the project's own files, served as they are at `http://<project>.localhost:47320/`, and the `page:*` tools look at it. Nothing of the project runs on the machine, and only what `fs:read` reads is served — never `.git/`, `.bushwhack/`, an ignored file or a declared secret file. The chat is told to build what works in the browser alone (its data in the page: localStorage, IndexedDB, or SQLite through WebAssembly). Chosen at setup, never a fallback: `bushwhack mode` says the mode, `bushwhack mode octopod|standalone` changes it.
 - Windows: `setup.ps1` sets bushwhack up in PowerShell — dependencies, the extension, the `bushwhack` command on the PATH (PowerShell, cmd and Git Bash). The service runs as a background process; the app tools work with Docker Desktop and an octopod that has its Windows fixes.
-
+- `page:open` says how the load went: the console errors and the failed requests, the first few of each — a script or a stylesheet missing, a CDN unreachable, now recorded too — or that there were none. The model no longer has to ask page:console and page:network blind.
 - A mascot: an adventurer in pixel art, fedora and machete, as the extension's icon (toolbar and extensions page, where Chrome showed a grey letter) and in the panel's header; `bushwhack` draws him in the terminal as it starts (in colour, in a terminal only; not under `NO_COLOR`).
 - The panel shows the extension's version beside its name: what to give in a report, and a way to see a reload took.
 
 ### Changed
 
+- Once the operator says no to a call, the calls after it in the same answer are not run (`status: skipped`, naming the refused one): they may have depended on it, and would only have put more questions. Sent again, they run.
 - The panel's *Forget* is the service's, next to "this browser is paired", and asks first — in the panel, saying which service, how many projects go with it, and that their chats are unbound. It sat on every project, though it always forgot the whole service.
 - *Send results automatically* is ticked by default: results go back to the chat without a click per round. A browser where it was unticked keeps it unticked.
 - The panel's pairing code field stands out — larger, a halo until it is focused (steady under reduced motion) — takes the keyboard when nothing else has it, and pairs on Enter.

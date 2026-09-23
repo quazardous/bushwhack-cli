@@ -3,7 +3,7 @@
  * before and after every action. Each refusal was checked to fail with its guard removed.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PageController, type Browser, type TabInfo, type TabStore } from './controller.js';
+import { loadSummary, PageController, type Browser, type TabInfo, type TabStore } from './controller.js';
 import { allowed, urlFor } from './origin.js';
 
 const APP = 'http://demo.localhost';
@@ -95,6 +95,16 @@ describe('PageController', () => {
     await page.run(request('open', { path: '/about' }));
     expect(browser.opened).toEqual(['http://demo.localhost/']);
     expect(browser.tabs.get(1)?.url).toBe('http://demo.localhost/about');
+  });
+
+  it('says how the load went: the console errors and failed requests, or that there were none', async () => {
+    const opened = await page.run(request('open', { path: '/' }));
+    expect(opened.content).toContain('1 console error:\n  boom');
+    expect(opened.content).toContain('page:console and page:network give them all');
+    expect(opened.meta).toMatchObject({ consoleErrors: 1, failedRequests: 0 });
+    expect(loadSummary([], [])).toBe('\nloaded with no console error and no failed request');
+    const five = Array.from({ length: 5 }, (_, i) => ({ method: 'GET', url: `/f${i}.js`, status: i ? 404 : 0 }));
+    expect(loadSummary([], five)).toContain('5 requests failed:\n  GET /f0.js → failed\n  GET /f1.js → 404\n  GET /f2.js → 404\n  … 2 more');
   });
 
   it('takes back the app tab it left in the group when its memory was cleared', async () => {

@@ -133,7 +133,8 @@ export function scanCall(text: string, marker: string = CALL_KEY): ScanResult | 
   return { kind: 'call', call: { tool, id, args, body } };
 }
 
-export type Status = 'ok' | 'error' | 'denied';
+/** `skipped`: not run, because a call before it in the same answer was denied. */
+export type Status = 'ok' | 'error' | 'denied' | 'skipped';
 
 export interface Result {
   tool: string;

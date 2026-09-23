@@ -135,6 +135,21 @@ describe('serve', () => {
     await expect(readFile(join(folder, 'a.txt'), 'utf8')).rejects.toThrow();
   });
 
+  it('runs nothing after a refused call in the same answer, and runs it when sent again', async () => {
+    verdict = 'no';
+    const reply = await bridge.call({ conversation: 'meta.ai/c1', calls: [write('w1', 'a.txt', 'a'), write('w2', 'b.txt', 'b'), read('r1', 'README.md')] }, 5000);
+    // Asked once: the rest is not even put to the operator.
+    expect(asked).toEqual(['w1 fs:write']);
+    expect(reply.summary.map((s) => s.status)).toEqual(['denied', 'skipped', 'skipped']);
+    expect(reply.text).toContain('w1 was denied just before it');
+    await expect(readFile(join(folder, 'b.txt'), 'utf8')).rejects.toThrow();
+    // Not recorded as skipped: the same call, sent again, runs.
+    verdict = 'yes';
+    const again = await bridge.call({ conversation: 'meta.ai/c1', calls: [write('w2', 'b.txt', 'b')] }, 5000);
+    expect(again.summary[0].status).toBe('ok');
+    expect(await readFile(join(folder, 'b.txt'), 'utf8')).toBe('b\n');
+  });
+
   it('answers a replay from the store instead of running it again', async () => {
     const call = write('w1', 'a.txt', 'hello');
     await bridge.call({ conversation: 'meta.ai/c1', calls: [call] }, 5000);

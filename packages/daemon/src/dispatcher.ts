@@ -125,6 +125,18 @@ export class Dispatcher {
     return { result, replay: false };
   }
 
+  /**
+   * A call not run: one before it in the same answer was denied, and what follows a refused
+   * step may depend on it. Not recorded — sent again later, it runs.
+   */
+  skip(text: string, refused: string): Dispatched {
+    const scanned = scanCall(text);
+    const id = scanned?.kind === 'call' ? scanned.call.id : scanned?.kind === 'invalid' ? scanned.id : null;
+    const tool = scanned?.kind === 'call' ? scanned.call.tool : 'unknown';
+    this.onEvent(`- ${id ?? '?'} ${tool} skipped`);
+    return { result: { tool, id, status: 'skipped', content: `not run: ${refused} was denied just before it, and this call may have depended on it — send it again in a new answer if it still makes sense` }, replay: false };
+  }
+
   private fail(id: string | null, tool: string, error: string): Dispatched {
     this.onEvent(`! ${id ?? '?'} ${tool} ${error}`);
     return { result: { tool, id, status: 'error', content: error }, replay: false };

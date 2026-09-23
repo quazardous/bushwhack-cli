@@ -117,6 +117,7 @@ export function renderManifest(specs: ToolSpec[], context: ManifestContext): str
     '  tools). Ignored files (`.gitignore`, `.bushwhackignore`) and `.git/` do not',
     '  exist for these tools. Ignore files change only through `ignore:add`: rules added, never removed.',
     '- Some tools need my approval in my terminal. `status: denied` means I said no — ask me, do not retry blindly.',
+    '- When I say no to a call, the calls after it in the same answer are not run (`status: skipped`): they may have depended on it. Send again, in a new answer, those that still make sense.',
     '- If bushwhack itself seems wrong — a tool misbehaving, a result that contradicts the files — or could serve you',
     '  better — something unclear here, a tool you miss, a step that costs you time — say so with `report:bug`',
     '  (kind: bug or suggestion; see it below), then carry on.',

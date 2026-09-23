@@ -232,7 +232,18 @@ export async function openSession(options: SessionOptions): Promise<OpenSession>
       const done = [];
       // The pictures of this request, for its image:save calls: requests run one at a time.
       pictures = payload.pictures ?? [];
-      for (const text of payload.calls) done.push(await dispatcher.dispatch(payload.conversation, text, envelope.source));
+      // In order; once the operator says no, the rest of the answer is not run: it may depend
+      // on the refused step, and would only ask more questions nobody wants.
+      let refused: string | undefined;
+      for (const text of payload.calls) {
+        if (refused) {
+          done.push(dispatcher.skip(text, refused));
+          continue;
+        }
+        const d = await dispatcher.dispatch(payload.conversation, text, envelope.source);
+        done.push(d);
+        if (d.result.status === 'denied') refused = d.result.id ?? 'a call';
+      }
       const images = done.flatMap((d) => (d.image ? [{ id: d.result.id, image: d.image }] : []));
       const answer: ToolsCallReply = {
         text: formatResults(done.map((d) => (d.replay && d.result.meta?.image ? replayedPicture(d.result) : d.result))),

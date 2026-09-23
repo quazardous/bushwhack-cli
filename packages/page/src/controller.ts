@@ -59,6 +59,18 @@ export const LIMITS = { snapshotChars: 12_000, queryElements: 20, events: 50, wa
 
 const fail = (content: string): PageOutcome => ({ status: 'error', content });
 
+/** After page:open: the load's console errors and failed requests, the first few of each — or that there were none. */
+export function loadSummary(errors: { text: string }[], failed: { method: string; url: string; status: number }[]): string {
+  if (errors.length === 0 && failed.length === 0) return '\nloaded with no console error and no failed request';
+  const some = <T>(list: T[], line: (x: T) => string): string =>
+    list.slice(0, 3).map((x) => `\n  ${line(x)}`).join('') + (list.length > 3 ? `\n  … ${list.length - 3} more` : '');
+  return [
+    errors.length ? `\n${errors.length} console error${errors.length === 1 ? '' : 's'}:${some(errors, (e) => e.text)}` : '',
+    failed.length ? `\n${failed.length} request${failed.length === 1 ? '' : 's'} failed:${some(failed, (r) => `${r.method} ${r.url} → ${r.status || 'failed'}`)}` : '',
+    '\n(page:console and page:network give them all)',
+  ].join('');
+}
+
 function unwrap<T>(result: PageResult<T>): { ok: true; data: T } | { ok: false; outcome: PageOutcome } {
   return result.ok ? result : { ok: false, outcome: fail(result.error) };
 }
@@ -128,10 +140,20 @@ export class PageController {
               : 'the app failed on it (app:logs says why)'),
       );
     }
+    // How the load went, said at once: a page opens "fine" with its script missing or its
+    // CDN unreachable, and the model would otherwise only find out by asking blind.
+    const recorded = await this.browser.readRecorder(tabId).catch(() => undefined);
+    const errors = (recorded?.console ?? []).filter((e) => e.level === 'error');
+    const failed = (recorded?.network ?? []).filter((e) => !e.status || e.status >= 400);
     return {
       status: 'ok',
-      meta: { url: tab.url ?? url, title: tab.title ?? '', ...(typeof code === 'number' && code > 0 ? { http: code } : {}) },
-      content: `opened ${tab.url ?? url}`,
+      meta: {
+        url: tab.url ?? url,
+        title: tab.title ?? '',
+        ...(typeof code === 'number' && code > 0 ? { http: code } : {}),
+        ...(recorded ? { consoleErrors: errors.length, failedRequests: failed.length } : {}),
+      },
+      content: `opened ${tab.url ?? url}${recorded ? loadSummary(errors, failed) : ''}`,
     };
   }
 

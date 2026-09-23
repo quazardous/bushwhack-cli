@@ -8,6 +8,21 @@
  */
 export type Tone = 'idle' | 'busy' | 'wait' | 'error';
 
+/** The `bushwhack` terminals following the chat, and where its approvals go. */
+export interface Terminals {
+  count: number;
+  approvals: 'here' | 'terminal' | 'browser';
+}
+
+/** The terminal mark: shown when one follows the chat or takes its approvals; coloured when approvals go to a terminal. */
+export function terminalMark(t: Terminals | undefined): { shown: boolean; approving: boolean; title: string } {
+  if (!t || (t.count === 0 && t.approvals === 'browser')) return { shown: false, approving: false, title: '' };
+  const follows = t.count === 0 ? 'no terminal follows this chat' : t.count === 1 ? 'a bushwhack terminal follows this chat' : `${t.count} bushwhack terminals follow this chat`;
+  const where =
+    t.approvals === 'here' ? 'approvals are asked there (--approve-here)' : t.approvals === 'terminal' ? 'approvals are asked in the bushwhack approvals terminal' : 'approvals are asked here, in the browser';
+  return { shown: true, approving: t.approvals !== 'browser', title: `${follows} — ${where}` };
+}
+
 export interface HistoryEntry {
   at: number;
   dir: 'up' | 'down';
@@ -29,6 +44,9 @@ const STYLE = `
   box-shadow: 0 1px 4px rgb(0 0 0 / .3); cursor: pointer; user-select: none; max-width: 60vw; }
 .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.term { flex: none; padding: 0 5px; border-radius: 4px; font: 600 11px/1.4 ui-monospace, monospace; color: #9ca3af; background: #374151; }
+.term[hidden] { display: none; }
+.term.approving { color: #1f2937; background: #fbbf24; }
 .io { display: flex; gap: 6px; font-variant-numeric: tabular-nums; color: #9ca3af; flex: none; }
 .io span { transition: color .15s; }
 .io .flash-up { color: #60a5fa; }
@@ -54,7 +72,7 @@ function time(at: number): string {
 
 export class StatusBar {
   private host: HTMLElement | undefined;
-  private parts: { dot: HTMLElement; text: HTMLElement; up: HTMLElement; down: HTMLElement; panel: HTMLElement; list: HTMLElement; title: HTMLElement } | undefined;
+  private parts: { dot: HTMLElement; text: HTMLElement; term: HTMLElement; up: HTMLElement; down: HTMLElement; panel: HTMLElement; list: HTMLElement; title: HTMLElement } | undefined;
   private counts = { up: 0, down: 0 };
   private history: HistoryEntry[] = [];
   private session = '';
@@ -86,19 +104,24 @@ export class StatusBar {
     pill.title = 'bushwhack — click for the history';
     const dot = el('span', 'dot');
     const text = el('span', 'text');
+    const term = el('span', 'term', '>_');
+    term.hidden = true;
     const io = el('span', 'io');
     const up = el('span', '', '↑0');
     const down = el('span', '', '↓0');
     io.append(up, down);
-    pill.append(dot, text, io);
+    pill.append(dot, text, term, io);
     pill.addEventListener('click', () => this.toggle());
     bar.append(panel, pill);
     root.append(style, bar);
     // In <body>, and only ever after the page has hydrated (the content script waits for
     // the chat's own editor): a foreign node in <html> while React hydrates the document
     // derailed meta.ai's hydration, leaving the page without its editor.
+    // One bar per page: a copy of the script the extension left behind (reloaded under the
+    // page) may still have one up, frozen on what it was doing — it would hide this one.
+    for (const other of d.querySelectorAll('[data-bushwhack-status]')) if (other !== this.host) other.remove();
     d.body.appendChild(this.host);
-    this.parts = { dot, text, up, down, panel, list, title };
+    this.parts = { dot, text, term, up, down, panel, list, title };
     this.renderCounts();
     this.renderHistory();
     return this.parts;
@@ -113,6 +136,15 @@ export class StatusBar {
     parts.title.textContent = `history — ${session}`;
   }
 
+  /** The terminals following the chat: the `>_` mark, amber when approvals go to a terminal. */
+  setTerminals(t: Terminals | undefined): void {
+    const parts = this.mount();
+    const mark = terminalMark(t);
+    parts.term.hidden = !mark.shown;
+    parts.term.classList.toggle('approving', mark.approving);
+    parts.term.title = mark.title;
+  }
+
   /** Calls went out (`up`) or results came back (`down`): count them and flash. */
   transit(dir: 'up' | 'down', count: number): void {
     const parts = this.mount();
@@ -123,9 +155,13 @@ export class StatusBar {
     setTimeout(() => node.classList.remove(`flash-${dir}`), 1200);
   }
 
-  setHistory(entries: HistoryEntry[]): void {
+  /**
+   * The conversation's latest history, and how many calls and results it has had in all:
+   * the history keeps the last ones only, so counting it would stop at its size.
+   */
+  setHistory(entries: HistoryEntry[], totals?: { up: number; down: number }): void {
     this.history = entries;
-    this.counts = {
+    this.counts = totals ?? {
       up: entries.filter((e) => e.dir === 'up').length,
       down: entries.filter((e) => e.dir === 'down').length,
     };

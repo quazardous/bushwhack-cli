@@ -2,10 +2,12 @@
 Sets bushwhack up from a clone on Windows: dependencies, the extension, and the `bushwhack`
 command on your PATH. Safe to run again (after a pull, for instance). Needs no admin.
 
-  .\setup.ps1                        # puts the command in ~\.local\bin
+  .\setup.ps1                        # puts the command in ~\.local\bin; standalone by default:
+                                     # no Docker, no octopod - the chat's app is the project's
+                                     # files served as they are, nothing run
   .\setup.ps1 -Dev                   # the same, for development: no production extension build
-  .\setup.ps1 -Standalone            # a minimal install: no Docker, no octopod - the chat's app is
-                                     # the project's files served as they are, nothing run
+  .\setup.ps1 -UseOctopod            # the app in its containers instead, through octopod
+                                     # (Docker Desktop): a dev server, databases
   .\setup.ps1 -NoTray                # ... without the tray icon and its Start menu shortcut
   $env:BIN_DIR="$HOME\bin"; .\setup.ps1   # ... or elsewhere
 
@@ -16,6 +18,7 @@ kept across runs: `bushwhack mode` says it and changes it.
 param(
   [switch]$Dev,
   [switch]$Standalone,
+  [switch]$UseOctopod,
   [switch]$NoTray,
   [switch]$Help
 )
@@ -92,7 +95,9 @@ if (-not $onPath) {
 }
 
 $bushwhack = Join-Path $Root 'bin\bushwhack.cmd'
+# Standalone unless octopod is asked for; a mode chosen before is kept across runs.
 if ($Standalone) { & $bushwhack mode standalone | Out-Null }
+if ($UseOctopod) { & $bushwhack mode octopod | Out-Null }
 # `bushwhack mode` says "standalone: ..." or "octopod: ...": its first word, without the colon.
 $mode = ((& $bushwhack mode) -split '\s+' | Where-Object { $_ })[0].TrimEnd(':')
 
@@ -100,11 +105,11 @@ if ($mode -eq 'standalone') {
   Say 'Web app: standalone'
   Write-Host "  the chat's app is the project's files served as they are, at http://<project>.localhost:<port>/:"
   Write-Host '  HTML, CSS and JavaScript in the browser, nothing run on this machine - no Docker, no octopod'
-  Write-Host '  (for an app in containers, with a dev server and databases: bushwhack mode octopod)'
+  Write-Host '  (for an app in containers, with a dev server and databases: .\setup.ps1 -UseOctopod)'
 } else {
   Say 'Web app tools (optional)'
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Warn 'Docker is not installed: the chat will get the file and secret tools only (.\setup.ps1 -Standalone: its files served as a site instead)'
+    Warn 'Docker is not installed: octopod mode needs it (.\setup.ps1 -Standalone: the project's files served as a site instead)'
   } elseif (-not $(docker compose version 2>$null | Out-Null; $LASTEXITCODE -eq 0)) {
     Warn 'Docker Compose v2 (docker compose) is missing: the app tools need it'
   } elseif (-not $(docker info 2>$null | Out-Null; $LASTEXITCODE -eq 0)) {
@@ -186,5 +191,5 @@ Write-Host @"
   4. On a meta.ai, Gemini or ChatGPT conversation, open the bushwhack panel: pair once with
      the code bushwhack list shows, then "Use for this chat" and "Insert the tools manifest".
 
-  More: $Root\docs\QUICKSTART.md
+  More: $Root\docs\guide.md
 "@

@@ -4,7 +4,7 @@
 // for a service that is not running. No dependency: PNGs are written with zlib.
 //
 //   npm run ext:icons
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
 import { PALETTE, SPRITE } from '@bushwhack/protocol';
@@ -82,8 +82,8 @@ export function png(scale: number, sprite: readonly string[] = SPRITE, palette: 
 }
 
 /** The sprite as SVG rectangles: sharp at any size (shape-rendering crispEdges). */
-export function svg(sprite: readonly string[] = SPRITE): string {
-  const rects = sprite.flatMap((row, y) => [...row].map((c, x) => (c === '.' ? '' : `<rect x="${x}" y="${y}" width="1" height="1" fill="${PALETTE[c]}"/>`)).filter(Boolean));
+export function svg(sprite: readonly string[] = SPRITE, palette: Readonly<Record<string, string>> = PALETTE): string {
+  const rects = sprite.flatMap((row, y) => [...row].map((c, x) => (c === '.' ? '' : `<rect x="${x}" y="${y}" width="1" height="1" fill="${palette[c]}"/>`)).filter(Boolean));
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sprite.length} ${sprite.length}" shape-rendering="crispEdges">${rects.join('')}</svg>\n`;
 }
 
@@ -97,5 +97,12 @@ if (process.argv[1]?.split('\\').join('/').endsWith('extension/icons/gen-icons.t
   writeFileSync(new URL('tray.ico', here), ico(frames(PALETTE)));
   writeFileSync(new URL('tray-down.ico', here), ico(frames(grey(PALETTE))));
   writeFileSync(new URL('preview.png', here), png(24));
-  console.log('extension/icons: icon-16/32/48/128.png, icon.svg, tray.ico, tray-down.ico (and preview.png, not shipped)');
+  // The GNOME Shell indicator: the same two, as SVG (the panel scales them to its size).
+  const gnome = new URL('../../gnome/bushwhack@quazardous.github.io/icons/', here);
+  mkdirSync(gnome, { recursive: true });
+  writeFileSync(new URL('bushwhack.svg', gnome), svg());
+  writeFileSync(new URL('bushwhack-down.svg', gnome), svg(SPRITE, grey(PALETTE)));
+  // The README's: the same adventurer, under docs/.
+  writeFileSync(new URL('../../docs/mascot.svg', here), svg());
+  console.log('extension/icons: icon-16/32/48/128.png, icon.svg, tray.ico, tray-down.ico (and preview.png, not shipped); gnome/…/icons: bushwhack.svg, bushwhack-down.svg; docs/mascot.svg');
 }

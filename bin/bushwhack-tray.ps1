@@ -96,8 +96,8 @@ function Open-Terminal([string]$folder, [string]$what) {
 # Read where bushwhack writes it, so it is known with the service stopped too.
 $configFile = if ($env:XDG_CONFIG_HOME) { Join-Path $env:XDG_CONFIG_HOME 'bushwhack\config.json' } else { Join-Path $env:USERPROFILE '.config\bushwhack\config.json' }
 function Get-Mode {
-    try { if ((Get-Content -Raw $configFile | ConvertFrom-Json).mode -eq 'standalone') { return 'standalone' } } catch { }
-    return 'octopod'
+    try { if ((Get-Content -Raw $configFile | ConvertFrom-Json).mode -eq 'octopod') { return 'octopod' } } catch { }
+    return 'standalone'
 }
 function Test-Octopod {
     return [bool]($env:BUSHWHACK_OCTOPOD -or (Get-Command octopod -ErrorAction SilentlyContinue))

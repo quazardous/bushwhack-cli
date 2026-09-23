@@ -7,7 +7,7 @@
  * whatever was read from a page outside the app must not reach the model. So when the tab
  * is no longer on the app afterwards, the action's result is thrown away.
  */
-import { clickPage, fillPage, queryPage, snapshotPage, waitPage, type PageResult } from './dom.js';
+import { clickPage, fillPage, queryPage, snapshotPage, storagePage, waitPage, type PageResult } from './dom.js';
 import { allowed, originOf, urlFor } from './origin.js';
 import type { PageOutcome, PageRequest } from './types.js';
 
@@ -55,7 +55,7 @@ export interface TabStore {
   set(session: string, tabId: number): Promise<void>;
 }
 
-export const LIMITS = { snapshotChars: 12_000, queryElements: 20, events: 50, waitMs: 30_000, loadMs: 15_000 } as const;
+export const LIMITS = { snapshotChars: 12_000, queryElements: 20, events: 50, waitMs: 30_000, loadMs: 15_000, storageChars: 20_000 } as const;
 
 const fail = (content: string): PageOutcome => ({ status: 'error', content });
 
@@ -85,9 +85,19 @@ export class PageController {
     if (request.origins.length === 0) return fail('the project has no app to look at — app:create first');
     if (request.action === 'open') return this.open(request);
 
-    const tabId = await this.tabs.get(request.session);
-    const tab = tabId === undefined ? undefined : await this.browser.getTab(tabId);
-    if (!tab) return fail('no page is open — page:open first');
+    // The tab the session opened — or, when that memory is gone (the extension was reloaded,
+    // its worker restarted), the app's tab still in the session's group: same page, same state.
+    let tabId = await this.tabs.get(request.session);
+    let tab = tabId === undefined ? undefined : await this.browser.getTab(tabId);
+    if (!tab) {
+      tabId = await this.browser.findTab({ session: request.session, name: request.name }, request.origins);
+      tab = tabId === undefined ? undefined : await this.browser.getTab(tabId);
+      if (tab) await this.tabs.set(request.session, tab.id);
+    }
+    if (!tab) {
+      const last = this.lastPath.get(request.session);
+      return fail(`no page of the app is open — its tab was closed${last ? '' : ', or the extension was reloaded meanwhile'}. ${last ? `page:open ${last} brings it back` : 'page:open first'}`);
+    }
     if (!allowed(tab.url, request.origins)) {
       return fail(`the page left the app (it is on ${originOf(tab.url) ?? 'no page'} now) — page:open brings it back`);
     }
@@ -103,6 +113,9 @@ export class PageController {
     return outcome;
   }
 
+  /** The last path page:open went to, per session: what a lost page is reopened with. */
+  private readonly lastPath = new Map<string, string>();
+
   private async open(request: PageRequest): Promise<PageOutcome> {
     let url: string;
     try {
@@ -110,6 +123,7 @@ export class PageController {
     } catch (e) {
       return fail((e as Error).message);
     }
+    this.lastPath.set(request.session, String(request.args.path ?? '/'));
     await this.browser.ensureRecorder(request.origins);
     const owner = { session: request.session, name: request.name };
     const known = (await this.tabs.get(request.session)) ?? (await this.browser.findTab(owner, request.origins));
@@ -187,6 +201,10 @@ export class PageController {
         const selector = a.selector === undefined || a.selector === '' ? null : str('selector');
         const timeout = Math.min(Number(a.timeout ?? 5) * 1000, LIMITS.waitMs);
         const r = unwrap(await this.browser.run(tabId, waitPage, [selector, timeout]));
+        return r.ok ? { status: 'ok', content: r.data } : r.outcome;
+      }
+      case 'storage': {
+        const r = unwrap(await this.browser.run(tabId, storagePage, [str('key'), str('db'), str('store'), LIMITS.storageChars]));
         return r.ok ? { status: 'ok', content: r.data } : r.outcome;
       }
       case 'console': {

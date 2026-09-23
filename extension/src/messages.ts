@@ -2,7 +2,7 @@
  * Messages inside the extension: content script ↔ service worker ↔ popup. The chat page
  * never sees these; the page only ever sees what the driver writes into its composer.
  */
-import type { Picture, ToolsCallReply } from '@bushwhack/protocol';
+import type { Picture, RefusedCall, ToolsCallReply } from '@bushwhack/protocol';
 
 export interface DiscoveredSession {
   port: number;
@@ -18,6 +18,20 @@ export interface DiscoveredSession {
   paired: boolean;
   /** Conversations bound to this session, and the tab each is open in, if any. */
   chats: { conversation: string; tabId?: number; title?: string }[];
+  /** The `bushwhack` terminals following its chat, as its service last said. */
+  terminals?: TerminalItem[];
+  /** Where its approvals go. */
+  approvals?: 'here' | 'terminal' | 'browser';
+}
+
+/** A terminal following a project's chat, as the panel lists it. */
+export interface TerminalItem {
+  id: string;
+  /** It takes the project's approvals (--approve-here). */
+  approves: boolean;
+  /** What it said of itself: its pid, its tty. */
+  label?: string;
+  since: number;
 }
 
 export interface TabInfo {
@@ -30,7 +44,7 @@ export interface TabInfo {
 
 /** Sent by the content script. */
 export type ContentRequest =
-  | { type: 'calls'; conversation: string; calls: string[]; pictures?: Picture[] }
+  | { type: 'calls'; conversation: string; calls: (string | RefusedCall)[]; pictures?: Picture[] }
   /** A generated picture the page may not read itself (no CORS): fetched by the worker, from a driver's image hosts only. */
   | { type: 'picture'; url: string }
   /** `born`: the conversation was born in this page — see arrival.ts. */
@@ -49,7 +63,27 @@ export type PopupRequest =
   | { type: 'manifest'; tabId: number }
   | { type: 'settings'; autoSend: boolean }
   | { type: 'focus'; tabId: number }
-  | { type: 'links' };
+  | { type: 'links' }
+  /** The calls waiting for a yes in this browser, and opening one's approval page. */
+  | { type: 'approvals' }
+  | { type: 'review'; key: string }
+  /** Close a terminal following a project's chat — confirmed in the panel first. */
+  | { type: 'close-terminal'; nodeId: string; terminal: string };
+
+/** A call waiting for a yes, as the panel lists it. */
+export interface ApprovalItem {
+  key: string;
+  project: string;
+  id: string;
+  tool: string;
+  summary: string;
+}
+
+/** Sent by the approval page, approve.html — by nothing else. */
+export type ApprovalPageRequest =
+  | { type: 'approval'; key: string }
+  /** `remember`: one of the request's scopes — its pattern, or true for the whole tool. */
+  | { type: 'approval-answer'; key: string; verdict: 'yes' | 'no'; remember?: string | true };
 
 /** Relay connections as the popup shows them. */
 export interface Links {
@@ -126,7 +160,8 @@ export interface WhoAmI {
 export type CallsResponse = ToolsCallReply | { error: string };
 export type PictureResponse = { dataUrl: string } | { error: string };
 /** `elsewhere`: another tab shows this conversation and acts for it — this one only says so. */
-export type StatusResponse = { bound: string | null; autoSend: boolean; elsewhere?: true };
+/** `terminals`: the `bushwhack` terminals following this chat, and where its approvals go. */
+export type StatusResponse = { bound: string | null; autoSend: boolean; elsewhere?: true; terminals?: { count: number; approvals: 'here' | 'terminal' | 'browser' } };
 
 export interface Settings {
   autoSend: boolean;

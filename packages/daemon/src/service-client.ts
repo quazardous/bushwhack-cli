@@ -176,12 +176,16 @@ export async function operatorClient(file: ServiceFile, nodeId: string, keep?: K
     add: (folder: string) => ask(SERVICE.add, { folder }),
     remove: (folder: string) => ask(SERVICE.remove, { folder }),
     list: () => ask(SERVICE.list),
+    /** The "always" rules given, for one project (its node) or all; `forget`: a tool, or true for all. */
+    always: (session?: string, forget?: string | true) => ask(SERVICE.always, { ...(session ? { session } : {}), ...(forget ? { forget } : {}) }),
     /** Take the approvals: from now on they come to this client. */
     approvalsHere: () => ask(SERVICE.approvalsHere, {}, 5000),
     /** Follow a project's chat: its chat:event messages come to this client. */
-    chatAttach: (session: string) => ask(SERVICE.chatAttach, { session }, 5000),
+    chatAttach: (session: string, label?: string) => ask(SERVICE.chatAttach, { session, ...(label ? { label } : {}) }, 5000),
     /** Send a prompt to a project's chat, through the extension. */
     chatSend: (session: string, text: string) => ask(SERVICE.chatSend, { session, text }),
+    /** Send a shell command and its output to the chat: the service masks the project's secrets in it first. */
+    chatSendShell: (session: string, text: string) => ask(SERVICE.chatSend, { session, text, shell: true }),
     /** Send the tools manifest to a project's chat, made by the extension for that chat. */
     chatManifest: (session: string) => ask(SERVICE.chatSend, { session, text: '', manifest: true }),
     close: () => {

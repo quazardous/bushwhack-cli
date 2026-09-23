@@ -1,6 +1,6 @@
 {
   "name": "bushwhack",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Let a web-chat model (Meta AI, Gemini, ChatGPT) work on a project folder on your machine, through a browser extension and a local service — you approve every change.",
   "license": "MIT",
   "author": "David Berlioz",

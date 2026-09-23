@@ -14,6 +14,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import ignore, { type Ignore } from 'ignore';
+import { comparableName } from './win-paths.js';
 
 export const IGNORE_FILES = ['.gitignore', '.bushwhackignore'] as const;
 
@@ -68,9 +69,13 @@ export class IgnoreRules {
    * Whether a normalized relative path is hidden from the chat. `isDir` matters: `build/`
    * in a `.gitignore` matches a directory named build, not a file.
    */
-  /** Inside `.git/` or `.bushwhack/`: hidden whatever else is declared. */
+  /**
+   * Inside `.git/` or `.bushwhack/`: hidden whatever else is declared — under any case and
+   * with trailing dots or spaces, as a case-insensitive file system (NTFS, APFS by default)
+   * finds them: `.GIT/config` is `.git/config` there.
+   */
   inHiddenDir(rel: string): boolean {
-    return rel.split('/').some((part) => HIDDEN_NAMES.has(part));
+    return rel.split('/').some((part) => HIDDEN_NAMES.has(comparableName(part)));
   }
 
   async isHidden(rel: string, isDir: boolean): Promise<boolean> {

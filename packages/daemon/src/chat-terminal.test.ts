@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { HubNode, WebSocketTransport } from '@bushwhack/hub';
 import { CHAT } from '@bushwhack/protocol';
 import { connectBridge } from './bridge-client.js';
-import { busyAfter, renderEvent, renderMarkdown, runChatOnce, runChatTerminal, styleFor, whereLines } from './chat-terminal.js';
+import { busyAfter, renderEvent, renderMarkdown, runChatOnce, runChatTerminal, styleFor, whereLines, approvalLines, shellMessage } from './chat-terminal.js';
 import type { OctopodClient } from './octopod-client.js';
 import { readServiceFile, startService, type Service } from './service.js';
 
@@ -156,5 +156,35 @@ describe('an error in short', () => {
     const { shortError } = await import('./session-node.js');
     expect(shortError('\nno tool "fs:wrte"; the tools are …\nmore')).toBe('no tool "fs:wrte"; the tools are …');
     expect(shortError('x'.repeat(300))).toHaveLength(200);
+  });
+});
+
+describe('where approvals are asked, said when the terminal opens', () => {
+  const plain = styleFor(false);
+  it('says the browser, and how to answer here instead', () => {
+    expect(approvalLines(false, plain)).toEqual([
+      '  approvals in the browser — each change pops up a notification (Yes / No); a click on it shows the whole diff',
+      '            to answer them in this terminal instead: bushwhack --approve-here',
+    ]);
+  });
+  it('says this terminal, with --approve-here', () => {
+    expect(approvalLines(true, plain)).toEqual(['  approvals in this terminal (--approve-here) — each change asks here, with its diff']);
+  });
+});
+
+describe('a !command sent to the chat', () => {
+  it('says what ran and what it printed, colours and all stripped', () => {
+    expect(shellMessage('ls', '\x1b[34msrc\x1b[0m\nREADME.md\n', 0)).toBe(["I ran this in the project's folder:", '', '```', '$ ls', 'src\nREADME.md', '```'].join('\n'));
+    expect(shellMessage('false', '', 1)).toContain("folder (exit code 1):");
+    expect(shellMessage('false', '', 1)).toContain('(no output)');
+    expect(shellMessage('nope', 'sh: nope: not found', null)).toContain('(it could not run)');
+  });
+
+  it('keeps the end of a long output, and fences one holding a fence', () => {
+    const long = shellMessage('cat big', 'x'.repeat(25_000) + 'END', 0);
+    expect(long).toContain('characters before, cut');
+    expect(long).toContain('END');
+    expect(long.length).toBeLessThan(21_000);
+    expect(shellMessage('cat a.md', '```js\ncode\n```', 0)).toContain('~~~~\n$ cat a.md');
   });
 });

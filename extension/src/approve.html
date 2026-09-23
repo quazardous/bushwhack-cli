@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>bushwhack — approve?</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f5f7; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
+      --accent: #2563eb; --ok: #16a34a; --bad: #dc2626; --add: #dcfce7; --del: #fee2e2;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115; --card: #181b21; --text: #e5e7eb; --muted: #9ca3af; --line: #2a2f38;
+        --accent: #60a5fa; --ok: #4ade80; --bad: #f87171; --add: #14271c; --del: #2c1618;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, sans-serif; }
+    header { display: flex; align-items: center; gap: 10px; padding: 12px 20px; background: var(--card); border-bottom: 1px solid var(--line); }
+    .logo { width: 28px; height: 28px; image-rendering: pixelated; }
+    header .what { display: flex; flex-direction: column; min-width: 0; }
+    header b { font-size: 15px; }
+    header .path { font: 12px ui-monospace, monospace; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    pre { flex: 1; margin: 0; padding: 12px 20px; overflow: auto; font: 13px/1.45 ui-monospace, monospace; white-space: pre; }
+    pre .add { display: block; background: var(--add); }
+    pre .del { display: block; background: var(--del); }
+    pre .hunk { display: block; color: var(--accent); }
+    footer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 20px; background: var(--card); border-top: 1px solid var(--line); }
+    footer .note { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+    .remember { display: flex; align-items: center; gap: 6px; margin-right: auto; }
+    .remember[hidden] { display: none; }
+    select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+    button { padding: 7px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; cursor: pointer; }
+    button:hover { border-color: var(--muted); }
+    button.yes { border-color: var(--ok); background: var(--ok); color: #fff; }
+    button.no { border-color: var(--bad); color: var(--bad); }
+    button:disabled { opacity: .5; cursor: default; }
+    .done { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 15px; }
+  </style>
+</head>
+<body>
+  <header>
+    <img class="logo" src="icons/icon.svg" alt="">
+    <div class="what"><b id="title">Loading…</b><span id="path" class="path"></span></div>
+  </header>
+  <pre id="text"></pre>
+  <footer id="actions">
+    <label class="remember" id="remember-row" hidden><input type="checkbox" id="remember"> Remember the answer for <select id="scope"></select></label>
+    <button id="yes" class="yes">Yes</button>
+    <button id="no" class="no">No</button>
+    <span class="note" id="note">Nothing is written before you answer.</span>
+  </footer>
+  <script type="module" src="approve.js"></script>
+</body>
+</html>

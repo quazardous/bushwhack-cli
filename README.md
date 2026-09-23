@@ -1,108 +1,169 @@
-# bushwhack
+<p align="center"><img src="docs/mascot.svg" width="112" height="112" alt="bushwhack's mascot: a pixel-art adventurer, machete raised"></p>
 
-> Let a web-chat model (Meta AI, Gemini, ChatGPT) work on a project folder on your machine — with you approving every change in your terminal.
+<h1 align="center">bushwhack</h1>
+
+<p align="center"><b>Let a web chat — Meta AI, Gemini, ChatGPT — work on a folder of your machine.<br>Every change waits for your yes.</b></p>
+
+<p align="center">
+  <a href="https://github.com/quazardous/bushwhack-cli/actions/workflows/ci.yml"><img src="https://github.com/quazardous/bushwhack-cli/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/license-MIT-a6e3a1" alt="MIT license">
+  <img src="https://img.shields.io/badge/node-22%2B-89b4fa" alt="Node 22+">
+  <img src="https://img.shields.io/badge/chats-Meta%20AI%20%C2%B7%20Gemini%20%C2%B7%20ChatGPT-f5c2e7" alt="Meta AI, Gemini, ChatGPT">
+</p>
 
 > [!IMPORTANT]
 > An independent project, not affiliated with Meta, Google or OpenAI. It drives their web
 > chats, whose terms may not allow it, and what the model reads goes to their servers.
-> Read [DISCLAIMER.md](./DISCLAIMER.md) before using it; security in [SECURITY.md](./SECURITY.md).
+> Read the [disclaimer](./DISCLAIMER.md) first.
 
-A chat model in a browser tab cannot touch your files. bushwhack gives it tools: the
-model writes tool calls as code blocks in its answer, a browser extension picks them up
-and hands them to a small daemon running in your project folder, and the results are
-written back into the chat's message box for the model to read. Reads are free; every
-write, edit, move or delete stops in your terminal for a yes or no.
+You ask a chat for a little website, a game, a page of notes… and then you copy its code,
+file by file, into your computer. And again at every change.
 
-Status: early. What works today: file access from meta.ai, Gemini and ChatGPT, secret files, and a web app
-per project served at `http://<project>.localhost` (needs Docker and
-[octopod](https://github.com/quazardous/octopod) — `octopod` on the PATH, or `BUSHWHACK_OCTOPOD` pointing at it; or,
-installed `--standalone`, the project's files served as they are, with neither).
-The model can also look at that app's page — read it, click, fill, see its console and
-requests, and get a picture of it — in a background tab the extension opens for it, and
-never on any other site (see [ARCHITECTURE.md](./ARCHITECTURE.md)).
+**bushwhack does the copying.** The chat writes the files itself, in a folder you chose — and
+before anything is written, you see what changes and say yes or no. Then it opens the page
+it made, looks at it, and fixes what's wrong. You never paste a line of code.
 
-## Install
+## 🎬 What it looks like
 
-Requires Node 22+ and Chromium.
+<p align="center"><img src="docs/terminal.svg" alt="bushwhack's terminal: a prompt sent to Meta AI, its fs:write call shown with the new file's content, approved with y, the result sent back, and Meta AI's answer"></p>
+
+You type what you want; the chat answers in its web page as usual — and when it wants to
+create a file, bushwhack asks you first — in a browser notification, or, as here, in the
+terminal (`bushwhack --approve-here`).
+
+## 🧭 How it works
+
+<p align="center"><img src="docs/how-it-works.svg" alt="The web chat sends tool calls to the extension, which passes them to the bushwhack service, which runs them on your folder after your yes; the results travel back the same way"></p>
+
+- 🗣️ **The chat asks** — "write this file", "show me that page": bushwhack teaches it how.
+- 🧩 **A browser extension carries the request** from the chat's page to your computer, and
+  the answer back.
+- 🧑‍⚖️ **You decide** — the chat may look at your folder freely, but every change waits for
+  your yes: in a notification, or in the terminal.
+
+## 🚀 Get started
+
+bushwhack runs in a **terminal** — a window where you type commands. It takes five commands
+in all, and they are all below: copy, paste, press Enter.
+
+- **Windows:** open the Start menu, type `PowerShell`, open it.
+- **Linux:** open the *Terminal* application.
+
+You need:
+
+- **Node.js 22 or later** — [nodejs.org](https://nodejs.org), the *LTS* version. Check with
+  `node -v` in a terminal.
+- **Chrome or Chromium.**
+- An account on **meta.ai**, **Gemini** or **ChatGPT**.
+
+### 1️⃣ Install bushwhack
+
+[**Download the ZIP**](https://github.com/quazardous/bushwhack-cli/archive/refs/heads/main.zip)
+and unzip it somewhere it can stay (your home folder, say). Then, in a terminal, go into
+that folder and run the installer:
 
 ```sh
-git clone https://github.com/quazardous/bushwhack-cli bushwhack && cd bushwhack
-./setup.sh                 # dependencies, the extension, `bushwhack` on your PATH
+# Windows (PowerShell)
+cd ~\bushwhack-cli-main
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
-On Windows, run `.\setup.ps1` in PowerShell instead (the service then runs as a background
-process). It also puts bushwhack in the notification area: the projects and the chats
-they are live in, a terminal in a project in one click, the pairing code to copy
-(`-NoTray` leaves it out).
+```sh
+# Linux
+cd ~/bushwhack-cli-main
+./setup.sh
+```
 
-A minimal install, without Docker or octopod: `./setup.sh --standalone` (`.\setup.ps1
--Standalone`). The chat's app is then the project's own files, served as they are at
-`http://<project>.localhost:47320/` — HTML, CSS and JavaScript in the browser, nothing run
-on your machine, no `app:*` tools. `bushwhack mode` says which mode is set, and changes it.
+It takes a minute or two. If it ends by saying a folder "is not on your PATH", copy the line
+it shows, paste it, press Enter, then close the terminal and open a new one.
 
-Load the extension once: `chrome://extensions` → enable **Developer mode** → **Load
-unpacked** → pick `extension/dist`.
+(Using git? `git clone https://github.com/quazardous/bushwhack-cli` works just as well.)
 
-## Usage
+bushwhack also gets an icon of its own: in the notification area on Windows, in the top bar
+on GNOME (after you log out and back in). 🎒
 
-In each folder you want a chat to work on:
+### 2️⃣ Add the extension to your browser
+
+1. Go to `chrome://extensions` (type it in the address bar).
+2. Turn on **Developer mode**, top right.
+3. Click **Load unpacked** and pick the `extension/dist` folder, inside the one you unzipped.
+4. Pin the bushwhack icon (the puzzle piece → 📌) so it stays in sight.
+
+### 3️⃣ Share a folder
+
+Make a folder for your project, go into it and start bushwhack:
 
 ```sh
+mkdir ~/my-site
+cd ~/my-site
 bushwhack
 ```
 
-The first time, it asks whether to share the folder; then it is the project's chat in the
-terminal — what you type goes to the web chat bound to it, the answers and tool calls come
-back — and your approvals for every project are answered there.
+bushwhack asks if you want to share this folder: answer `y`. It then shows a **pairing
+code** (like `ABCD-EFGH-IJKL`) — keep this terminal open, it's where you'll talk to the chat.
 
-The first `bushwhack` command starts the service (through systemd's user manager, or in the
-background) — one for all your projects. `bushwhack list` shows them, and the **pairing
-code**. Then, on a meta.ai, Gemini or ChatGPT conversation:
+> [!WARNING]
+> Everything in the folder may be read by the chat, and so sent to Meta, Google or OpenAI.
+> Share a folder made for it, never your whole home folder.
 
-1. Click the bushwhack icon on the chat: its panel opens over the page (× or Escape closes it),
-   with your projects listed under their service. Type
-   the service's pairing code under its name, once per browser — never in the chat — and pair.
-2. **Use for this chat** binds the conversation to a project.
-3. **Insert the tools manifest** puts the instructions for the model in the message box.
-   Send it, then ask for what you want done.
+### 4️⃣ Connect a chat
 
-The model's calls run in order; approvals appear at `bushwhack approvals`, named after
-the project, with a diff for file writes. Results go back into the message box and are
-sent by themselves (*Send results automatically*, in the panel: untick it to send them
-yourself).
+Open a new conversation on meta.ai, Gemini or ChatGPT, then click the bushwhack icon:
 
-`bushwhack serve` still serves one folder alone, from its own terminal.
+1. type the **pairing code** under the service's name, and click **Pair** — once per browser;
+2. click **Use for this chat** — this conversation now works on your folder.
 
-What the model can see: everything in the folder except `.git/` and what your
-`.gitignore` (or a `.bushwhackignore`) ignores. Those paths do not exist for it, for
-reading or writing. Anything else it reads goes to the chat provider — point bushwhack at
-a folder you are willing to share.
+> [!WARNING]
+> The pairing code goes in the bushwhack panel only — **never in a chat**.
 
-Secrets: list the files that hold them in `.bushwhack/secrets.jsonc`, e.g.
-`{ "files": { "app/.env": { "format": "dotenv" } } }`. The model then sees
-`STRIPE_KEY=‹secret:STRIPE_KEY›`, can ask for a variable with `secret:add`, and you type the
-value in the `serve` terminal — it is never echoed, and never sent to the chat.
+### 5️⃣ Ask, and say yes
 
-Without a browser, the same session can be driven from a second terminal:
+Back in the terminal, type what you want and press Enter:
 
-```sh
-bushwhack tools                        # the manifest the model gets
-bushwhack call fs:list                 # one call, as the chat would send it
-echo 'hello' | bushwhack call fs:write path=hello.txt
+```text
+❯ make me a page with my favourite recipes, one card per recipe
 ```
 
-## Documentation
+The chat gets it and gets to work. Each time it wants to create or change a file, **a
+notification** pops up — *semis · c12 fs:write — index.html: new file, 40 lines* — with
+**Yes** and **No**. Click the notification itself to see everything it will write, and **remember
+your answer** — for this file (ticked for you), for every `.js` file, or for all files — so the
+next ones like it are not asked. Nothing is written before you answer; the terminal says
+where each one stands.
 
-- [docs/QUICKSTART.md](./docs/QUICKSTART.md) — install, first session, secrets, the web app
-  and its page, and what to do when something does not work.
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — the design, the call protocol, the security
-  model, and why each piece is the way it is.
-- [TODO.md](./TODO.md) — where the work stands and what comes next.
+Rather answer in the terminal? Start it with `bushwhack --approve-here`: it shows the change
+with what the answer may be remembered for: `y` says yes, `y3` says yes to every `.js`
+file from now on.
 
-## Contributing
+**See your page:** its address is shown next to `app:` in the terminal, and in the panel —
+`http://my-site.localhost:47320/`. Open it in your browser; reload it after each change.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+> [!TIP]
+> Keep the chat's browser window visible: hidden, the page slows down (Meta AI doesn't even
+> load its message box).
+
+## 🧰 What the chat can do
+
+| | |
+|---|---|
+| 📄 **Files** | read, create, change, move and delete the files of your folder — and nothing outside it |
+| 👀 **Its page** | open the page it built, read it, click, fill a form, take a picture of it, see its errors |
+| 🖼️ **Pictures** | save a picture it generated into your folder (Meta AI, Gemini) |
+| 🔑 **Secrets** | prepare a file for passwords or keys — you type the values, the chat never sees them |
+| 🐞 **Bugs** | tell bushwhack's developers when something goes wrong |
+
+Reading your folder happens at once; **every change waits for your yes**.
+
+## 📚 More
+
+- 📖 [The guide](./docs/guide.md) — everything else: several projects, approvals and "always", secrets, pictures, bug reports
+- ⌨️ [The command](./docs/cli.md) — every `bushwhack` command and option
+- 🩺 [Troubleshooting](./docs/troubleshooting.md) — when it does not work
+- 🐙 [octopod mode](./docs/octopod.md) — for developers: a real app with a server and a database, in containers
+- 🏗️ [Architecture](./ARCHITECTURE.md) — how it is built, and why
+- 🔐 [Security](./SECURITY.md) and the [disclaimer](./DISCLAIMER.md)
+- 🤝 [Contributing](./CONTRIBUTING.md) · 📝 [Changelog](./CHANGELOG.md)
 
 ## License
 
-MIT. See [LICENSE](./LICENSE).
+MIT — see [LICENSE](./LICENSE).

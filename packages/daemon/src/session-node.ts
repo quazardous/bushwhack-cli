@@ -63,7 +63,11 @@ function isCallRequest(payload: unknown): payload is ToolsCallRequest {
     p.conversation.length > 0 &&
     p.conversation.length <= 200 &&
     Array.isArray(p.calls) &&
-    p.calls.every((c) => typeof c === 'string') &&
+    p.calls.every(
+      (c) =>
+        typeof c === 'string' ||
+        (!!c && typeof c === 'object' && typeof (c as { error?: unknown }).error === 'string' && ['string', 'object'].includes(typeof (c as { id?: unknown }).id)),
+    ) &&
     (p.pictures === undefined ||
       (Array.isArray(p.pictures) &&
         p.pictures.length <= 8 &&
@@ -103,7 +107,7 @@ export function siteTools(url: string): ToolSpec[] {
           ...spec,
           notes: [
             `The app is the project's files as they are, served at ${url} — a path is a file of the project (a folder serves its index.html). Nothing runs them on the machine: no npm run dev, no build, no server code, no database server. There are no app:* tools.`,
-            'Build what works in the browser alone: HTML, CSS and JavaScript (ES modules; a library as a file of the project, or from a CDN). Keep data in the page — localStorage or IndexedDB, or SQLite in the page through WebAssembly (sql.js or wa-sqlite, its .wasm a file of the project), a starting .db file loaded with fetch.',
+            'Build what works in the browser alone: HTML, CSS and JavaScript (ES modules; a library as a file of the project, or from a CDN). Keep data in the page — localStorage or IndexedDB, or SQLite in the page through WebAssembly (sql.js or wa-sqlite, its .wasm a file of the project), a starting .db file loaded with fetch. page:storage reads what the page keeps, to check what it wrote.',
             'After writing a file, page:open again to load it: the site sends every file fresh.',
             ...(spec.notes ?? []),
           ],
@@ -118,6 +122,8 @@ export interface OpenSession {
   appLine: string;
   /** The addresses the app is served at; none without an app. */
   appUrls(): Promise<string[]>;
+  /** What the chat must not see: masks declared secret values and the app's credentials. */
+  mask(): Promise<(text: string) => string>;
   close(): void;
 }
 
@@ -235,7 +241,13 @@ export async function openSession(options: SessionOptions): Promise<OpenSession>
       // In order; once the operator says no, the rest of the answer is not run: it may depend
       // on the refused step, and would only ask more questions nobody wants.
       let refused: string | undefined;
-      for (const text of payload.calls) {
+      for (const entry of payload.calls) {
+        // Refused by the page (its text arrived altered): answered, never run, never recorded.
+        if (typeof entry !== 'string') {
+          done.push(dispatcher.refuse(entry.id, entry.error));
+          continue;
+        }
+        const text = entry;
         if (refused) {
           done.push(dispatcher.skip(text, refused));
           continue;
@@ -269,6 +281,7 @@ export async function openSession(options: SessionOptions): Promise<OpenSession>
     workspace,
     appLine,
     appUrls: () => appUrls().catch(() => []),
+    mask: redactor,
     close() {
       options.sites?.remove(session.name);
       transport.disconnect();

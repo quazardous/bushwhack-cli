@@ -1,6 +1,6 @@
 {
   "name": "@bushwhack/workspace",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "The project folder as the chat sees it: a realpath jail, ignore rules that hide, and the fs:* tools",
   "license": "MIT",
   "author": "David Berlioz",
@@ -22,8 +22,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bushwhack/protocol": "0.1.0",
+    "@bushwhack/protocol": "0.3.0",
     "ignore": "^7.0.9",
-    "@bushwhack/secrets": "0.1.0"
+    "@bushwhack/secrets": "0.3.0"
   }
 }

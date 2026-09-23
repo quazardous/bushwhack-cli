@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import type { Workspace } from '@bushwhack/workspace';
 import type { Approver, ToolRun, Verdict } from './dispatcher.js';
+import type { Scope } from './approval-rules.js';
 
 const PREVIEW_LINES = 60;
 
@@ -96,6 +97,49 @@ export function readHidden(input: NodeJS.ReadableStream & { isTTY?: boolean; set
     input.on('data', onData);
     input.resume();
   });
+}
+
+/** A terminal's answer to an approval: yes or no, and what to remember it for. */
+export interface TerminalAnswer {
+  verdict: 'yes' | 'no';
+  /** A pattern, or true for the whole tool. */
+  remember?: string | true;
+}
+
+/**
+ * Ask a terminal. The scopes the answer may be remembered for are shown with the question,
+ * numbered, narrowest first; `y` or `n` answers this call only, `y3` / `n2` answers and
+ * remembers it for that scope. `a` (always) is yes for the widest. `r` asks the scope, then
+ * yes or no, a step at a time. Without scopes (a secret's removal), yes or no only.
+ */
+export async function askTerminal(question: (prompt: string) => Promise<string>, write: (text: string) => void, scopes: Scope[] = []): Promise<TerminalAnswer> {
+  const n = scopes.length;
+  if (n > 0) write(`│ remember it for: ${scopes.map((s, i) => `${i + 1} ${s.pattern ?? s.label}`).join(' · ')}\n`);
+  const prompt = n > 0 ? `└ approve? [y]es / [n]o — or y1…y${n} / n1…n${n} to remember it: ` : '└ approve? [y]es / [n]o: ';
+  const scoped = (verdict: 'yes' | 'no', scope: Scope): TerminalAnswer => ({ verdict, remember: scope.pattern ?? true });
+  for (;;) {
+    const a = (await question(prompt)).trim().toLowerCase();
+    if (a === 'y' || a === 'yes') return { verdict: 'yes' };
+    if (a === 'n' || a === 'no') return { verdict: 'no' };
+    if (n === 0) continue;
+    const at = /^([yn])\s*(\d+)$/.exec(a);
+    if (at && scopes[Number(at[2]) - 1]) return scoped(at[1] === 'y' ? 'yes' : 'no', scopes[Number(at[2]) - 1]);
+    if (a === 'a' || a === 'always') return scoped('yes', scopes[n - 1]);
+    if (a !== 'r' && a !== 'remember') continue;
+    write(`${scopes.map((s, i) => `│ ${i + 1}  ${s.label}${s.pattern ? `  ${s.pattern}` : ''}`).join('\n')}\n`);
+    let scope: Scope | undefined;
+    while (!scope) {
+      const k = (await question(`└ remember it for [1-${n}] (empty: back): `)).trim();
+      if (k === '') break;
+      scope = scopes[Number(k) - 1];
+    }
+    if (!scope) continue;
+    for (;;) {
+      const v = (await question(`└ and the answer for ${scope.pattern ?? scope.label}, [y]es or [n]o: `)).trim().toLowerCase();
+      if (v === 'y' || v === 'yes') return scoped('yes', scope);
+      if (v === 'n' || v === 'no') return scoped('no', scope);
+    }
+  }
 }
 
 export class TerminalApprover implements Approver {

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { DiscoveredSession } from './messages.js';
-import { reconcile, shortPath, type ListContext } from './popup-list.js';
+import { reconcile, renderDetail, shortPath, terminalSummary, type ListContext } from './popup-list.js';
 
 const ctx = (connected: Record<string, boolean> = {}): ListContext => ({
   links: { dev: null, sessions: connected },
@@ -14,8 +14,12 @@ const ctx = (connected: Record<string, boolean> = {}): ListContext => ({
   forget: () => {},
   focus: () => {},
   open: (url) => opened.push(url),
+  details: (s) => detailed.push(s.nodeId),
+  closeTerminal: (s, terminal) => closed.push(`${s.nodeId} ${terminal}`),
 });
 const opened: string[] = [];
+const detailed: string[] = [];
+const closed: string[] = [];
 
 const session = (nodeId: string, paired: boolean, service?: string): DiscoveredSession => ({
   port: 47300,
@@ -92,7 +96,7 @@ describe('forgetting a pairing', () => {
   it('is the service\'s, not a project\'s: one Forget, in the header', () => {
     const list = document.createElement('div');
     reconcile(list, [session('shop', true, 'svc'), session('blog', true, 'svc')], forgetting());
-    expect(list.querySelectorAll('.session button')).toHaveLength(0);
+    expect([...list.querySelectorAll('.session button')].filter((b) => b.textContent?.startsWith('Forget'))).toHaveLength(0);
     expect([...list.querySelectorAll('.service button')].map((b) => b.textContent)).toEqual(['Forget…']);
   });
 
@@ -135,4 +139,33 @@ describe('the pairing code field', () => {
     expect(paired).toEqual(['ABCD-EFGH']);
     list.remove();
   });
+
+  it('sums up the terminals on the card, and opens the project\'s details', () => {
+    const list = document.createElement('div');
+    const shop = { ...session('shop', true, 'svc'), terminals: [{ id: 'approvals:a', approves: true, label: 'pid 12 · pts/3', since: 0 }, { id: 'chat:b', approves: false, since: 0 }], approvals: 'here' as const };
+    reconcile(list, [shop], ctx());
+    expect(list.querySelector('.terminals')!.textContent).toBe('>_ 2 terminals · approvals asked there');
+    expect(list.querySelector('.terminals .term')!.classList.contains('approving')).toBe(true);
+    (([...list.querySelectorAll('button')].find((b) => b.textContent === 'Details'))!).click();
+    expect(detailed).toEqual(['shop']);
+    expect(terminalSummary({ terminals: [] })).toBeUndefined();
+  });
+
+  it('closes a terminal from the details on a second click of its power button', () => {
+    const shop = { ...session('shop', true, 'svc'), terminals: [{ id: 'approvals:a', approves: true, label: 'pid 12 · pts/3', since: 0 }], approvals: 'here' as const };
+    const detail = renderDetail(shop, ctx(), () => {});
+    document.body.append(detail);
+    expect(detail.querySelector('.terminal .what span')!.textContent).toBe('pid 12 · pts/3');
+    expect(detail.querySelector('.terminal .what small')!.textContent).toBe('takes the approvals');
+    expect(detail.querySelector('.aside-head h1')!.textContent).toBe('shop');
+    const power = detail.querySelector('button.power') as HTMLButtonElement;
+    power.click();
+    expect(closed).toEqual([]);
+    expect(power.classList.contains('armed')).toBe(true);
+    expect(detail.querySelector('.arm-note')!.textContent).toBe('click again to close it — its approvals then go to the browser');
+    power.click();
+    expect(closed).toEqual(['shop approvals:a']);
+    expect(power.classList.contains('armed')).toBe(false);
+  });
+
 });

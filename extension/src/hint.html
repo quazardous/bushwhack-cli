@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>bushwhack</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb; --accent: #2563eb; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #181b21; --text: #e5e7eb; --muted: #9ca3af; --line: #2a2f38; --accent: #60a5fa; } }
+    body { margin: 0; width: 320px; padding: 14px 16px; background: var(--bg); color: var(--text); font: 13px/1.5 system-ui, sans-serif; }
+    header { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px; margin-bottom: 8px; }
+    img { width: 24px; height: 24px; image-rendering: pixelated; }
+    p { margin: 0 0 10px; }
+    ul { margin: 0 0 10px; padding: 0; list-style: none; display: flex; gap: 8px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    ul a { display: inline-block; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; }
+    .muted { color: var(--muted); font-size: 12px; }
+    code { font: 12px ui-monospace, monospace; }
+  </style>
+</head>
+<body>
+  <header><img src="icons/icon.svg" alt="">bushwhack</header>
+  <p>bushwhack works on a web chat's page. Open a conversation, then click this icon there to connect it to one of your projects:</p>
+  <ul>
+    <li><a href="https://www.meta.ai/" target="_blank" rel="noopener">Meta AI</a></li>
+    <li><a href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a></li>
+    <li><a href="https://chatgpt.com/" target="_blank" rel="noopener">ChatGPT</a></li>
+  </ul>
+  <p class="muted">No project yet? In a terminal, in its folder: <code>bushwhack</code>.</p>
+  <p class="muted"><a href="popup.html" target="_blank">Open the full panel</a> — your projects, pairing, the calls waiting for your yes.</p>
+</body>
+</html>

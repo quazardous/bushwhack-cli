@@ -1,6 +1,6 @@
 {
   "name": "@bushwhack/hub",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Message bus nodes and transports: envelope routing, dedup, replyToId pairing",
   "license": "MIT",
   "author": "David Berlioz",

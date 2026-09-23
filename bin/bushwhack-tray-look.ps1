@@ -15,7 +15,7 @@ function Get-TrayLook($list) {
     $count = if ($projects.Count -eq 1) { '1 project' } else { "$($projects.Count) projects" }
     $chats = if ($live.Count -eq 0) { 'no chat open' } elseif ($live.Count -eq 1) { '1 chat live' } else { "$($live.Count) chats live" }
     $browser = if ($browsers.Count -eq 0) { ', no browser paired' } else { '' }
-    $mode = if ($list.mode -eq 'standalone') { ' (standalone)' } else { '' }
+    $mode = if ($list.mode -eq 'octopod') { ' (octopod)' } else { '' }
     return @{
         up = $true
         line = "$count - $chats$browser$mode"

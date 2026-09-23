@@ -18,7 +18,7 @@ best effort, not a guarantee. Do not use bushwhack on a project holding anything
 not hand to that provider.
 
 **You approve what changes.** Reads are free; every write, edit, move, delete and app
-command waits for your yes in a terminal. `--yolo` answers yes to all of them without
+command waits for your yes, in the browser or in a terminal. `--yolo` answers yes to all of them without
 asking: use it only on a project you can lose.
 
 **Early software.** Tools, formats and commands may change between versions. bushwhack is

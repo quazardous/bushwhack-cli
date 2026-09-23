@@ -1,6 +1,6 @@
 {
   "name": "@bushwhack/page",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "The page:* tools: the session app's tab, bounded DOM reading and actions, and the origin check around each",
   "license": "MIT",
   "author": "David Berlioz",
@@ -26,6 +26,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bushwhack/protocol": "0.1.0"
+    "@bushwhack/protocol": "0.3.0"
   }
 }

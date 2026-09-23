@@ -10,11 +10,14 @@
  * line rewritten in place while the model answers.
  */
 import { randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { readlinkSync } from 'node:fs';
 import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createInterface, type Interface } from 'node:readline';
 import { CHAT, type ChatEvent } from '@bushwhack/protocol';
-import { readHidden } from './approval.js';
+import { askTerminal, readHidden } from './approval.js';
+import type { Scope } from './approval-rules.js';
 import { SERVICE, SERVICE_NODE, type ProjectEntry, type ServiceFile } from './service.js';
 import { operatorClient } from './service-client.js';
 
@@ -26,13 +29,14 @@ export interface Style {
   bold(s: string): string;
   dim(s: string): string;
   red(s: string): string;
+  yellow(s: string): string;
   cyan(s: string): string;
   green(s: string): string;
 }
 
 export function styleFor(tty: boolean): Style {
   const wrap = (open: number, close: number) => (s: string) => (tty ? `\x1b[${open}m${s}\x1b[${close}m` : s);
-  return { bold: wrap(1, 22), dim: wrap(2, 22), red: wrap(31, 39), green: wrap(32, 39), cyan: wrap(36, 39) };
+  return { bold: wrap(1, 22), dim: wrap(2, 22), red: wrap(31, 39), green: wrap(32, 39), cyan: wrap(36, 39), yellow: wrap(33, 39) };
 }
 
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -150,12 +154,52 @@ export function whereLines(view: ServiceView, project: ProjectEntry, style: Styl
   return lines;
 }
 
+/** How much of a `!command`'s output goes to the chat: its end, where errors and results are. */
+const SHELL_MAX = 20_000;
+
+/** A `!command` and its output, as the chat gets them. */
+export function shellMessage(command: string, output: string, code: number | null): string {
+  // eslint-disable-next-line no-control-regex
+  let text = output.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').replace(/\r(?!\n)/g, '\n').trimEnd();
+  if (text.length > SHELL_MAX) text = `… (${text.length - SHELL_MAX} characters before, cut)\n${text.slice(-SHELL_MAX)}`;
+  const fence = text.includes('```') ? '~~~~' : '```';
+  const status = code === null ? ' (it could not run)' : code === 0 ? '' : ` (exit code ${code})`;
+  return [`I ran this in the project's folder${status}:`, '', fence, `$ ${command}`, ...(text ? [text] : ['(no output)']), fence].join('\n');
+}
+
+/** Where this terminal's project asks for approvals — said when it opens, and by /status. */
+export function approvalLines(approveHere: boolean, style: Style): string[] {
+  if (approveHere) return [`  approvals ${style.bold('in this terminal')} ${style.dim('(--approve-here) — each change asks here, with its diff')}`];
+  return [
+    `  approvals ${style.yellow('in the browser')} — each change pops up a notification (Yes / No); a click on it shows the whole diff`,
+    style.dim('            to answer them in this terminal instead: bushwhack --approve-here'),
+  ];
+}
+
 async function loadHistory(file: string): Promise<string[]> {
   try {
     return (await readFile(file, 'utf8')).split('\n').filter(Boolean).slice(-HISTORY_MAX).reverse();
   } catch {
     return [];
   }
+}
+
+/** The answers remembered, as the service lists them (`/always`, `bushwhack approvals --always`). */
+export interface RulesReply {
+  rules: { project: string; rule: string; answer: 'yes' | 'no' }[];
+  forgotten: { project: string; rule: string; answer: 'yes' | 'no' }[];
+  errors?: { project: string; error: string }[];
+}
+
+export function ruleLines(r: RulesReply, withProject: boolean): string[] {
+  const name = (x: { project: string }): string => (withProject ? `${x.project}: ` : '');
+  const says = (x: { answer: string; rule: string }): string => `${x.answer === 'yes' ? 'always' : 'never '} ${x.rule}`;
+  return [
+    ...(r.errors ?? []).map((e) => `  ⚠ ${name(e)}${e.error}`),
+    ...r.forgotten.map((f) => `  forgotten: ${name(f)}${says(f)} — asked again from now`),
+    ...(r.rules.length > 0 ? r.rules.map((x) => `  ${name(x)}${says(x)}`) : ['  no answer remembered — every call is asked']),
+    '  (kept in each project\'s .bushwhack/approval-rules.json)',
+  ];
 }
 
 export interface ChatTerminalOptions {
@@ -165,8 +209,25 @@ export interface ChatTerminalOptions {
   stateDir: string;
   /** Say yes to every approval of this project, without asking — the operator's choice (`--yolo`). */
   yolo?: boolean;
+  /**
+   * Take the approvals here (`--approve-here`; `--yolo` implies it): of this project, and of
+   * the others when no other terminal takes them. Without it they are asked in the browser,
+   * and this terminal only says where they stand.
+   */
+  approveHere?: boolean;
   input?: NodeJS.ReadStream;
   output?: NodeJS.WriteStream;
+}
+
+/** How a terminal names itself to the panel: its pid, and its tty where one is known. */
+export function terminalLabel(pid = process.pid): string {
+  let tty = '';
+  try {
+    tty = readlinkSync('/proc/self/fd/0');
+  } catch {
+    // not Linux, or no tty: the pid says enough
+  }
+  return `pid ${pid}${tty.startsWith('/dev/') ? ` · ${tty.slice(5)}` : ''}`;
 }
 
 /** The interactive chat. Resolves when the operator leaves (/quit, Ctrl-D). */
@@ -176,16 +237,17 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
   const style = styleFor(Boolean(output.isTTY));
   const historyFile = join(options.stateDir, 'history');
   const { project } = options;
-  // An approvals: node, so the approvals of every project come here too.
-  const client = await operatorClient(options.file, `approvals:${randomBytes(4).toString('hex')}`, {
+  const approveHere = options.approveHere === true || options.yolo === true;
+  // Taking approvals: an approvals: node, so the approvals of every project come here too.
+  const client = await operatorClient(options.file, `${approveHere ? 'approvals' : 'chat'}:${randomBytes(4).toString('hex')}`, {
     lost: () => {
       setBusy(undefined);
       say(style.red('  ✻ the service is gone (restarted?) — reconnecting…'));
     },
     // A new service knows neither the chat this terminal follows nor where approvals go.
     back: async () => {
-      await client.approvalsHere();
-      await client.chatAttach(project.nodeId);
+      if (approveHere) await client.approvalsHere();
+      await client.chatAttach(project.nodeId, terminalLabel());
       say(style.dim('  ✻ the service is back'));
     },
   });
@@ -231,9 +293,15 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
   };
   let suspended = false;
 
+  /** What arrived while the prompt was stepped aside (a `!command`, a secret value): said after. */
+  const held: string[] = [];
   /** Print above the prompt, then give the prompt back — nothing once the terminal is left. */
   const say = (text: string): void => {
     if (leaving) return;
+    if (suspended) {
+      held.push(text);
+      return;
+    }
     output.write(`\r\x1b[2K${text}\n`);
     if (busy) output.write(`${busyLine()}\n`);
     rl.prompt(true);
@@ -243,10 +311,27 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
     const line = raw.trim();
     if (line === '') return rl.prompt();
     await appendFile(historyFile, `${line.replace(/\n/g, ' ')}\n`).catch(() => undefined);
+    if (line.startsWith('!')) {
+      const command = line.slice(1).trim();
+      if (command === '') return say(style.dim('  !<command> runs it in the project\'s folder, then sends it and its output to the chat'));
+      // In turn with the approvals: none writes over the command, and it waits for none.
+      approvals = approvals.then(() => runLocal(command));
+      return;
+    }
     if (line.startsWith('/')) {
       const [command] = line.split(/\s+/);
       if (command === '/quit' || command === '/exit') return rl.close();
-      if (command === '/help') return say(style.dim('  type a prompt to send it to the chat bound to this project\n  /manifest send the chat the tools manifest: what bushwhack is, and how to call it\n  /status   the instance, the browsers and where prompts go, the projects\n  /quit     leave (Ctrl-D too)'));
+      if (command === '/help') return say(style.dim('  type a prompt to send it to the chat bound to this project\n  !<cmd>    run a shell command in the project\'s folder; it and its output go to the chat (secrets masked)\n  /manifest send the chat the tools manifest: what bushwhack is, and how to call it\n  /status   the instance, the browsers and where prompts go, the projects\n  /always   the answers remembered here; /always forget <rule, pattern or tool>, or /always forget all\n  /quit     leave (Ctrl-D too)'));
+      if (command === '/always') {
+        const [, verb, ...named] = line.split(/\s+/);
+        const what = named.join(' ');
+        const forget = verb === 'forget' ? (what === 'all' || !what ? true : what) : undefined;
+        try {
+          return say(style.dim(ruleLines((await client.always(project.nodeId, forget)) as unknown as RulesReply, false).join('\n')));
+        } catch (e) {
+          return say(style.red(`  ${(e as Error).message}`));
+        }
+      }
       if (command === '/manifest') {
         try {
           const reply = (await client.chatManifest(project.nodeId)) as { conversation?: string };
@@ -258,7 +343,7 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
       }
       if (command === '/status') {
         const view = (await client.list()) as unknown as ServiceView;
-        return say([...whereLines(view, project, style), '', ...view.projects.map((p) => `  ${p.session === project.session ? style.bold(p.session) : p.session}  ${style.dim(p.folder)}`)].join('\n'));
+        return say([...whereLines(view, project, style), ...approvalLines(approveHere, style), '', ...view.projects.map((p) => `  ${p.session === project.session ? style.bold(p.session) : p.session}  ${style.dim(p.folder)}`)].join('\n'));
       }
       return say(style.red(`  unknown: ${command} — /help`));
     }
@@ -268,6 +353,44 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
       say(style.dim(`  ⎿  sent to ${reply.conversation ?? 'the chat'}`));
     } catch (e) {
       say(style.red(`  ${(e as Error).message}`));
+    }
+  };
+
+  /**
+   * `!command`: the operator's own shell, in the project's folder. Its output shows here as it
+   * comes, then the command and its output go to the chat — through the service, which masks
+   * the project's secrets in it. The prompt steps aside meanwhile; what arrives is said after.
+   */
+  const runLocal = async (command: string): Promise<void> => {
+    suspended = true;
+    rl.close();
+    output.write(`\r\x1b[2K${style.dim(`  $ ${command}`)}\n`);
+    let captured = '';
+    const code = await new Promise<number | null>((resolve) => {
+      const child = spawn(command, { cwd: project.folder, shell: process.env.SHELL || true, stdio: ['inherit', 'pipe', 'pipe'] });
+      const take = (chunk: Buffer): void => {
+        output.write(chunk);
+        captured += chunk.toString('utf8');
+      };
+      child.stdout.on('data', take);
+      child.stderr.on('data', take);
+      child.on('close', (c) => resolve(c));
+      child.on('error', (e) => {
+        captured += `${e.message}\n`;
+        output.write(style.red(`  ${e.message}\n`));
+        resolve(null);
+      });
+    });
+    if (code) output.write(style.dim(`  ⎿ exit ${code}\n`));
+    suspended = false;
+    open();
+    for (const text of held.splice(0)) say(text);
+    try {
+      const reply = (await client.chatSendShell(project.nodeId, shellMessage(command, captured, code))) as { conversation?: string };
+      setBusy('the model is answering…');
+      say(style.dim(`  ⎿  the command and its output sent to ${reply.conversation ?? 'the chat'}`));
+    } catch (e) {
+      say(style.red(`  not sent to the chat: ${(e as Error).message}`));
     }
   };
 
@@ -285,38 +408,36 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
   const answer = (envelope: { source: string; id: string }, payload: Record<string, unknown>): void => {
     client.node.emit(SERVICE.approvalReply, { key: options.file.operatorKey, ...payload }, { target: envelope.source, replyToId: envelope.id });
   };
+  // Closed from a browser's panel (the operator confirmed it there): say so, and leave.
+  client.node.on(SERVICE.close, (payload: unknown, envelope) => {
+    if (envelope.source !== SERVICE_NODE) return;
+    say(style.red(`  ✻ closed from the bushwhack panel, in ${String((payload as { by?: unknown })?.by ?? 'a browser')}`));
+    rl.close();
+  });
   client.node.on(SERVICE.notice, (payload: unknown, envelope) => {
     if (envelope.source !== SERVICE_NODE) return;
-    const p = payload as { project?: unknown; text?: unknown };
+    const p = payload as { project?: unknown; text?: unknown; approval?: unknown };
+    // A call accepted by an "always" rule: said, in the flow of the calls.
+    if (p.approval === true) return say(style.dim(`  ${String(p.text)}`));
     say(`  ${style.bold(String(p.project))}: ${String(p.text)} ${style.dim('(bushwhack reports)')}`);
   });
   client.node.on(SERVICE.approve, (payload: unknown, envelope) => {
-    const p = payload as { project: string; id: string; tool: string; text: string };
+    const p = payload as { project: string; id: string; tool: string; text: string; scopes?: Scope[] };
     // --yolo is for this terminal's project only: another's approval is asked, as ever.
     if (options.yolo && p.project === project.session) {
       // Shown all the same: what was done in the operator's name stays in sight.
-      answer(envelope, { verdict: 'yes' });
+      answer(envelope, { verdict: 'yes', yolo: true });
       say(`${style.red('┌ yolo')} ${p.project} · ${p.id} ${p.tool}\n${style.dim(String(p.text).replace(/^/gm, '│ '))}\n${style.red('└ accepted')}`);
       return;
     }
-    approvals = approvals.then(
-      () =>
-        new Promise<void>((resolve) => {
-          asking = true;
-          output.write(`\r\x1b[2K\n┌ ${p.project} · ${p.id} ${p.tool}\n${String(p.text).replace(/^/gm, '│ ')}\n`);
-          const ask = (): void =>
-            rl.question(`└ approve? [y]es / [n]o / [a]lways ${p.tool} for ${p.project}: `, (a) => {
-              const v = a.trim().toLowerCase();
-              const verdict = ['y', 'yes'].includes(v) ? 'yes' : ['n', 'no'].includes(v) ? 'no' : ['a', 'always'].includes(v) ? 'always' : undefined;
-              if (!verdict) return ask();
-              answer(envelope, { verdict });
-              asking = false;
-              rl.prompt();
-              resolve();
-            });
-          ask();
-        }),
-    );
+    approvals = approvals.then(async () => {
+      asking = true;
+      output.write(`\r\x1b[2K\n┌ ${p.project} · ${p.id} ${p.tool}\n${String(p.text).replace(/^/gm, '│ ')}\n`);
+      const question = (prompt: string): Promise<string> => new Promise((r) => rl.question(prompt, r));
+      answer(envelope, { ...(await askTerminal(question, (text) => output.write(text), p.scopes)) });
+      asking = false;
+      rl.prompt();
+    });
   });
   client.node.on(SERVICE.secret, (payload: unknown, envelope) => {
     const p = payload as { project: string; id: string; file: string; name: string; description?: string };
@@ -330,6 +451,7 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
       answer(envelope, { value: value ?? '' });
       suspended = false;
       open();
+      for (const text of held.splice(0)) say(text);
       rl.prompt();
     });
   });
@@ -338,9 +460,9 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
   // Only now, every handler in place, take the approvals — one sent sooner would reach a
   // terminal not listening yet, and wait for ever — then attach, which may wait a moment for
   // the browsers to say which chat they show.
-  await client.approvalsHere();
-  await client.chatAttach(project.nodeId);
-  output.write(`${whereLines((await client.list()) as unknown as ServiceView, project, style).join('\n')}\n\n`);
+  if (approveHere) await client.approvalsHere();
+  await client.chatAttach(project.nodeId, terminalLabel());
+  output.write(`${[...whereLines((await client.list()) as unknown as ServiceView, project, style), ...approvalLines(approveHere, style)].join('\n')}\n\n`);
   if (options.yolo) output.write(`${style.red(`  --yolo: every approval for ${project.session} is a yes, without asking — writes, deletes, app commands. Other projects' are asked; secret values are still yours to type.`)}\n\n`);
   output.write(style.dim(`  chat of ${project.session} — type a prompt; /status; /help; Ctrl-D to leave\n`));
   rl!.prompt();

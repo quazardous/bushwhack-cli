@@ -1,0 +1,8 @@
+{
+  "uuid": "bushwhack@quazardous.github.io",
+  "name": "bushwhack",
+  "description": "bushwhack in the top bar: its projects and the web chats they are live in, a terminal in a project, the pairing code, the service's mode. A view of the service, never its supervisor.",
+  "shell-version": ["46", "47", "48", "49", "50"],
+  "url": "https://github.com/quazardous/bushwhack-cli",
+  "version-name": "0.1.0"
+}

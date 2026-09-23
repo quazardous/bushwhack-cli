@@ -222,6 +222,16 @@ export class RelayServer {
 
   /** Rejects when the port is taken, so a caller can try the next one. */
   /** The clients connected now, with what each declared when it registered. */
+  /** Called with the node id of each client that registers — a new one, or one back. */
+  onConnect(handler: (nodeId: string) => void): void {
+    this.transport.onClientConnect((nodeId) => handler(nodeId));
+  }
+
+  /** Called with the node id of each client that goes away. */
+  onDisconnect(handler: (nodeId: string) => void): void {
+    this.transport.onClientDisconnect(handler);
+  }
+
   connected(): { nodeId: string; type: string; name: string; fingerprint: string | null }[] {
     return this.transport.getConnectedClients().map((nodeId) => {
       const info = this.transport.getClientInfo(nodeId);

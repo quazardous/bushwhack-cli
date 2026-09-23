@@ -17,8 +17,12 @@ import { appOwner, joinSessionGroup, leaveSessionGroup, watchTabGroups } from '.
 import { accept } from './accept.js';
 import { nextCallId } from './call-ids.js';
 import { ConversationOwners } from './conversation-owners.js';
+import { approvalKey, badgeOf, isApprovalRequest, notificationOf, summary, VERDICTS, type PendingApproval } from './approvals.js';
 import {
+  APPROVAL,
+  type ApprovalVerdict,
   BRIDGE,
+  type ChatTerminals,
   CHAT,
   type ChatSendRequest,
   EXTENSION_NODE_PREFIX,
@@ -34,6 +38,9 @@ import {
   DEV_CALL,
   type CallsResponse,
   type PictureResponse,
+  type ApprovalItem,
+  type ApprovalPageRequest,
+  type TerminalItem,
   type ContentRequest,
   type DevCommand,
   type DiscoveredSession,
@@ -229,6 +236,8 @@ async function sessionsWithChats(): Promise<DiscoveredSession[]> {
     session.chats = Object.entries(bound)
       .filter(([, nodeId]) => nodeId === session.nodeId)
       .map(([conversation]) => ({ conversation, ...open.get(conversation) }));
+    const following = terminals.get(session.nodeId);
+    if (following) Object.assign(session, { terminals: following.list, approvals: following.approvals });
   }
   return sessions;
 }
@@ -303,6 +312,32 @@ async function open(port: number, code: string, label: string): Promise<Connecti
     if (envelope.source !== SERVICE_NODE) return;
     void chatSend(payload as ChatSendRequest).then((answer) => node.emit(CHAT.reply, answer, { target: envelope.source, replyToId: envelope.id }));
   });
+  // Which terminals follow a project's chat, and where its approvals go: its page shows it.
+  node.on(CHAT.terminals, (payload: unknown, envelope) => {
+    const t = (payload ?? {}) as Partial<ChatTerminals>;
+    if (envelope.source !== SERVICE_NODE || typeof t.session !== 'string' || typeof t.terminals !== 'number') return;
+    const list = Array.isArray(t.list) ? t.list.filter((x) => typeof x?.id === 'string').map((x) => ({ id: x.id, approves: x.approves === true, ...(typeof x.label === 'string' ? { label: x.label } : {}), since: Number(x.since) || 0 })) : [];
+    terminals.set(t.session, { count: t.terminals, approvals: t.approvals === 'here' || t.approvals === 'terminal' ? t.approvals : 'browser', list });
+    stateChanged();
+  });
+  // A call waiting for the operator's yes, when no terminal takes the approvals. Only the
+  // service asks — the relay lets nobody else hold its name.
+  node.on(APPROVAL.ask, (payload: unknown, envelope) => {
+    if (envelope.source !== SERVICE_NODE || !isApprovalRequest(payload)) return;
+    const { project, id, tool, text, path, scopes, preset } = payload;
+    void askApproval({ project, id, tool, text, ...(path ? { path } : {}), ...(scopes ? { scopes } : {}), ...(preset !== undefined ? { preset } : {}), port, envelopeId: envelope.id, at: Date.now() });
+  });
+  node.on(APPROVAL.done, (payload: unknown, envelope) => {
+    const p = (payload ?? {}) as { project?: unknown; id?: unknown };
+    if (envelope.source !== SERVICE_NODE || typeof p.project !== 'string' || typeof p.id !== 'string') return;
+    void dropApproval(approvalKey({ port, project: p.project, id: p.id }));
+  });
+  // A secret value waits for a terminal: said here, typed there.
+  node.on(APPROVAL.notice, (payload: unknown, envelope) => {
+    const p = (payload ?? {}) as { project?: unknown; text?: unknown; secret?: unknown };
+    if (envelope.source !== SERVICE_NODE || p.secret !== true || typeof p.text !== 'string') return;
+    chrome.notifications?.create({ type: 'basic', iconUrl: chrome.runtime.getURL('icons/icon-128.png'), title: `${String(p.project)} · a secret value to type`, message: p.text, priority: 2 });
+  });
   // page:* calls come back from a session: only from a session paired on this relay, and
   // only about its own app, whose origins its daemon decided.
   node.on(PAGE_ACT, (payload: unknown, envelope) => {
@@ -357,6 +392,86 @@ async function connection(sessionNodeId: string): Promise<Connection> {
   if (port === undefined) throw new Error(`session "${pairing.session}" is not running (bushwhack list, or bushwhack serve in ${pairing.folder})`);
   return relay(port, pairing.code, pairing.service ? `service (${pairing.session})` : `session ${pairing.session}`);
 }
+
+// ─── Approvals ────────────────────────────────────────────────────────────────
+//
+// See approvals.ts. Kept in session storage: the worker may be stopped and started again
+// while a request waits, and the service still waits for the answer.
+
+async function pendingApprovals(): Promise<Record<string, PendingApproval>> {
+  return ((await chrome.storage.session.get('approvals')).approvals as Record<string, PendingApproval> | undefined) ?? {};
+}
+
+async function savePending(all: Record<string, PendingApproval>): Promise<void> {
+  await chrome.storage.session.set({ approvals: all });
+  await chrome.action.setBadgeBackgroundColor({ color: '#dc2626' });
+  await chrome.action.setBadgeText({ text: badgeOf(Object.keys(all).length) });
+  stateChanged();
+}
+
+async function askApproval(request: PendingApproval): Promise<void> {
+  const key = approvalKey(request);
+  await savePending({ ...(await pendingApprovals()), [key]: request });
+  const { title, message } = notificationOf(request);
+  chrome.notifications?.create(key, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
+    title,
+    message,
+    contextMessage: 'Click to see all of it',
+    buttons: [{ title: 'Yes' }, { title: 'No' }],
+    requireInteraction: true,
+    priority: 2,
+  });
+}
+
+async function dropApproval(key: string): Promise<void> {
+  const all = await pendingApprovals();
+  chrome.notifications?.clear(key);
+  if (!(key in all)) return;
+  delete all[key];
+  await savePending(all);
+}
+
+/** Answer the service that asked: false when that request no longer waits. */
+async function answerApproval(key: string, verdict: ApprovalVerdict, remember?: string | true): Promise<boolean> {
+  const request = (await pendingApprovals())[key];
+  if (!request || !VERDICTS.includes(verdict)) return false;
+  // Only a scope the service offered: it checks again, all the same.
+  const offered = remember === undefined || (request.scopes ?? []).some((s) => (s.pattern ?? true) === remember);
+  if (!offered) return false;
+  let conn = connections.get(request.port);
+  if (!conn?.transport.state.connected) {
+    // The worker was restarted since: connect again, with the code its projects were paired with.
+    const pairing = Object.values(await pairings()).find((p) => p.port === request.port);
+    if (!pairing) return false;
+    conn = await relay(request.port, pairing.code, pairing.service ? 'service' : `session ${pairing.session}`);
+  }
+  conn.node.emit(APPROVAL.reply, { verdict, ...(remember !== undefined ? { remember } : {}) }, { target: SERVICE_NODE, replyToId: request.envelopeId });
+  log(`${request.project}: ${request.id} ${request.tool} — ${verdict}${remember !== undefined ? `, remembered for ${remember === true ? request.tool : remember}` : ''}, in the browser`);
+  await dropApproval(key);
+  return true;
+}
+
+/** The approval page, in a window of its own. */
+async function approvalItems(): Promise<ApprovalItem[]> {
+  return Object.entries(await pendingApprovals())
+    .sort((a, b) => a[1].at - b[1].at)
+    .map(([key, p]) => ({ key, project: p.project, id: p.id, tool: p.tool, summary: summary(p) }));
+}
+
+async function reviewApproval(key: string): Promise<void> {
+  if (!(key in (await pendingApprovals()))) return;
+  await chrome.windows.create({ url: chrome.runtime.getURL(`approve.html?key=${encodeURIComponent(key)}`), type: 'popup', width: 820, height: 720, focused: true });
+}
+
+// Without the permission (not granted yet, after an update that added it), no notifications —
+// the badge and the panel still show what waits — but the worker must not fail over it.
+chrome.notifications?.onButtonClicked.addListener((key, button) => void answerApproval(key, button === 0 ? 'yes' : 'no'));
+chrome.notifications?.onClicked.addListener((key) => void reviewApproval(key));
+
+/** What each project's service last said of its terminals — rebuilt at the next chat:here. */
+const terminals = new Map<string, { count: number; approvals: 'here' | 'terminal' | 'browser'; list: TerminalItem[] }>();
 
 /** When this browser last told a service it holds a project's chat, by session. */
 const announced = new Map<string, number>();
@@ -563,7 +678,13 @@ async function onContent(request: ContentRequest, tabId: number | undefined): Pr
       }
       const pairing = nodeId ? (await pairings())[nodeId] : undefined;
       const acts = tabId === undefined || owners.report(tabId, request.conversation);
-      return { bound: pairing?.session ?? null, autoSend: (await settings()).autoSend, ...(acts ? {} : { elsewhere: true }) };
+      const following = nodeId ? terminals.get(nodeId) : undefined;
+      return {
+        bound: pairing?.session ?? null,
+        autoSend: (await settings()).autoSend,
+        ...(acts ? {} : { elsewhere: true }),
+        ...(following ? { terminals: { count: following.count, approvals: following.approvals } } : {}),
+      };
     }
     case 'picture':
       return fetchPicture(request.url);
@@ -642,8 +763,8 @@ let stateTimer: ReturnType<typeof setTimeout> | undefined;
 function stateChanged(): void {
   clearTimeout(stateTimer);
   stateTimer = setTimeout(() => {
-    void Promise.all([linksNow(), sessionsWithChats()])
-      .then(([links, sessions]) => chrome.runtime.sendMessage({ type: 'popup-state', links, sessions }))
+    void Promise.all([linksNow(), sessionsWithChats(), approvalItems()])
+      .then(([links, sessions, approvals]) => chrome.runtime.sendMessage({ type: 'popup-state', links, sessions, approvals }))
       .catch(() => undefined);
   }, 150);
 }
@@ -659,10 +780,33 @@ async function onPopup(request: PopupRequest): Promise<unknown> {
   }
 }
 
+async function onApprovalPage(request: ApprovalPageRequest): Promise<unknown> {
+  if (request.type === 'approval') return (await pendingApprovals())[request.key] ?? null;
+  if (request.type === 'approval-answer') return { answered: await answerApproval(request.key, request.verdict, request.remember) };
+  return { error: 'unknown request' };
+}
+
 async function onPopupRequest(request: PopupRequest): Promise<unknown> {
   switch (request.type) {
-    case 'discover':
-      return sessionsWithChats();
+    case 'approvals':
+      return approvalItems();
+    case 'review':
+      await reviewApproval(request.key);
+      return { ok: true };
+    case 'close-terminal': {
+      const { node } = await connection(request.nodeId);
+      const reply = (await node.request(CHAT.closeTerminal, { session: request.nodeId, terminal: request.terminal }, { target: SERVICE_NODE, timeoutMs: 5000 })).payload as { ok?: boolean; error?: string };
+      if (reply?.error) throw new Error(reply.error);
+      return { ok: true };
+    }
+    case 'discover': {
+      const sessions = await sessionsWithChats();
+      // Connected to each paired service while the panel looks: it says, on connecting, which
+      // terminals follow its projects — the panel shows them as they come.
+      const byPort = new Map(sessions.filter((x) => x.paired).map((x) => [x.port, x.nodeId]));
+      for (const nodeId of byPort.values()) void connection(nodeId).catch(() => undefined);
+      return sessions;
+    }
     case 'focus': {
       const tab = await chrome.tabs.update(request.tabId, { active: true });
       if (tab?.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true });
@@ -780,9 +924,10 @@ async function injectIntoOpenChats(): Promise<void> {
 watchTabGroups();
 // Chat tabs opening, changing conversation or closing change what the popup lists.
 /**
- * The icon: the panel over the chat shown — an overlay the content script draws, framing
- * the panel page — or, on any other page (or a chat page that does not answer yet), the
- * panel in a tab of its own.
+ * The icon: on a chat, the panel over it — an overlay the content script draws, framing the
+ * panel page (a chat page that does not answer yet: the panel in a tab of its own). On any
+ * other page, a few lines saying what to do, in the icon's popup — set for that click only,
+ * so a chat's click still reaches here.
  */
 chrome.action.onClicked.addListener((tab) => {
   void (async () => {
@@ -792,8 +937,21 @@ chrome.action.onClicked.addListener((tab) => {
     } catch {
       // not a page
     }
-    if (tab.id !== undefined && selectDriver(DRIVERS, host) && (await askTab<boolean>(tab.id, { type: 'panel', tabId: tab.id }))) return;
-    await chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+    if (selectDriver(DRIVERS, host)) {
+      if (tab.id !== undefined && (await askTab<boolean>(tab.id, { type: 'panel', tabId: tab.id }))) return;
+      await chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+      return;
+    }
+    if (tab.id === undefined) return;
+    await chrome.action.setPopup({ tabId: tab.id, popup: 'hint.html' });
+    try {
+      await chrome.action.openPopup({ windowId: tab.windowId });
+    } catch {
+      // A browser that cannot open it from here: the same lines, in a tab.
+      await chrome.tabs.create({ url: chrome.runtime.getURL('hint.html') });
+    } finally {
+      await chrome.action.setPopup({ tabId: tab.id, popup: '' });
+    }
   })();
 });
 
@@ -830,6 +988,11 @@ chrome.runtime.onInstalled.addListener(() => void injectIntoOpenChats());
 chrome.runtime.onStartup.addListener(() => void injectIntoOpenChats());
 
 chrome.runtime.onMessage.addListener((message: { from?: string } & (ContentRequest | PopupRequest), sender, respond) => {
+  // The approval page, and only it, answers approvals: an extension page no site can frame.
+  if (accept(sender, { id: chrome.runtime.id, panelPaths: ['/approve.html'], hosts: [] }) === 'popup') {
+    void onApprovalPage(message as unknown as ApprovalPageRequest).then(respond, (e: Error) => respond({ error: e.message }));
+    return true;
+  }
   const who = accept(sender, { id: chrome.runtime.id, panelPaths: ['/popup.html', '/frame.html'], hosts: DRIVERS.flatMap((d) => d.hosts) });
   if (!who) {
     if (__DEV__) log(`refused a message from ${sender.url ?? '?'} (frame ${sender.frameId ?? '-'}, tab ${sender.tab?.id ?? '-'})`);

@@ -3,7 +3,7 @@
  * card in place and only updates its status, rebuilding a card when what it shows has
  * changed — so nothing moves under the operator's fingers.
  */
-import type { DiscoveredSession, Links, TabInfo } from './messages.js';
+import type { DiscoveredSession, Links, TabInfo, TerminalItem } from './messages.js';
 
 export interface ListContext {
   links: Links;
@@ -15,6 +15,10 @@ export interface ListContext {
   focus(tabId: number): void;
   /** Open the project's app in a tab. */
   open(url: string): void;
+  /** Show a project's detail view. */
+  details(s: DiscoveredSession): void;
+  /** Close a terminal following the project's chat — asked first. */
+  closeTerminal(s: DiscoveredSession, terminal: string): void;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
@@ -40,7 +44,7 @@ function status(s: DiscoveredSession, ctx: ListContext): { state: boolean | unde
  * operator's fingers (a code being pasted, a button about to be clicked).
  */
 function shapeOf(s: DiscoveredSession, ctx: ListContext): string {
-  return JSON.stringify([s.session, s.folder, s.url, s.paired, s.chats, ctx.tab?.driver, ctx.tab?.bound?.nodeId, ctx.tabId]);
+  return JSON.stringify([s.session, s.folder, s.url, s.paired, s.chats, s.terminals, s.approvals, ctx.tab?.driver, ctx.tab?.bound?.nodeId, ctx.tabId]);
 }
 
 /** The end of a path, where the project's own folder is: the whole of it on hover. */
@@ -142,14 +146,146 @@ function renderSession(s: DiscoveredSession, ctx: ListContext): HTMLElement {
     }
     card.append(line);
   }
+  const terms = terminalSummary(s);
+  if (terms) card.append(el('div', { className: 'terminals' }, el('span', { className: `term${s.approvals === 'here' ? ' approving' : ''}` }, '>_'), ` ${terms}`));
   const row = el('div', { className: 'row' });
   if (ctx.tab?.driver && ctx.tab.bound?.nodeId !== s.nodeId && ctx.tabId !== undefined) {
     const bind = el('button', { className: 'primary', textContent: 'Use for this chat' });
     bind.onclick = () => ctx.bind(s);
     row.append(bind);
   }
-  if (row.childElementCount > 0) card.append(row);
+  const details = el('button', { className: 'quiet', textContent: 'Details' });
+  details.onclick = () => ctx.details(s);
+  row.append(details);
+  card.append(row);
   return card;
+}
+
+/** The terminals following a project's chat, in a few words — undefined when there are none. */
+export function terminalSummary(s: Pick<DiscoveredSession, 'terminals'>): string | undefined {
+  const list = s.terminals ?? [];
+  if (list.length === 0) return undefined;
+  const n = list.length === 1 ? '1 terminal' : `${list.length} terminals`;
+  return list.some((t) => t.approves) ? `${n} · approvals asked there` : n;
+}
+
+function since(at: number): string {
+  const minutes = Math.round((Date.now() - at) / 60_000);
+  return minutes < 1 ? 'just opened' : `open for ${minutes < 60 ? `${minutes} min` : `${Math.round(minutes / 60)} h`}`;
+}
+
+/** A power symbol, drawn: no font carries one everywhere. */
+function powerIcon(): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of ['M12 3v9', 'M6.3 6.8a8 8 0 1 0 11.4 0']) {
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', d);
+    svg.append(path);
+  }
+  return svg;
+}
+
+/**
+ * Close a terminal: a red power button, clicked twice. The first click arms it and says what
+ * a second one does, beside it; left alone a few seconds, it disarms.
+ */
+function closeButton(s: DiscoveredSession, t: TerminalItem, ctx: ListContext): HTMLElement {
+  const button = el('button', { className: 'power', title: 'Close this terminal' });
+  button.setAttribute('aria-label', 'Close this terminal');
+  button.append(powerIcon());
+  const note = el('span', { className: 'arm-note' });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const disarm = (): void => {
+    clearTimeout(timer);
+    button.classList.remove('armed');
+    note.textContent = '';
+  };
+  button.onclick = () => {
+    if (!button.classList.contains('armed')) {
+      button.classList.add('armed');
+      note.textContent = `click again to close it${t.approves ? ' — its approvals then go to the browser' : ''}`;
+      timer = setTimeout(disarm, 4000);
+      return;
+    }
+    disarm();
+    ctx.closeTerminal(s, t.id);
+  };
+  return el('span', { className: 'close' }, note, button);
+}
+
+/** The head of a view beside the projects: the way back, a title, a line under it. */
+export function asideHead(title: string, sub: string, back: () => void): HTMLElement {
+  const backButton = el('button', { textContent: '← Projects', title: 'back to the projects (Escape)' });
+  backButton.onclick = back;
+  return el('div', { className: 'aside-head' }, backButton, el('div', {}, el('h1', {}, title), el('div', { className: 'sub', title: sub }, sub)));
+}
+
+function section(title: string, ...children: (Node | string)[]): HTMLElement {
+  return el('section', { className: 'section' }, el('h4', {}, title), ...children);
+}
+
+/**
+ * One project in full, beside the list: its app and chats, where its approvals go, and the
+ * terminals following its chat — each can be closed from here, after a confirmation.
+ */
+export function renderDetail(s: DiscoveredSession, ctx: ListContext, back: () => void): HTMLElement {
+  const view = el('div', { className: 'detail' }, asideHead(s.session, s.folder, back));
+  view.dataset.shape = shapeOf(s, ctx);
+
+  const where = section('App and chats');
+  if (s.url) {
+    const link = el('a', { href: s.url, textContent: s.url });
+    link.onclick = (e) => {
+      e.preventDefault();
+      ctx.open(s.url!);
+    };
+    where.append(el('div', { className: 'line' }, 'app ', link));
+  }
+  if (s.chats.length === 0) where.append(el('div', { className: 'line muted' }, 'no chat bound yet — open one, then Use for this chat'));
+  for (const chat of s.chats) {
+    const line = el('div', { className: 'line' });
+    if (chat.tabId !== undefined) {
+      const link = el('a', { href: '#', textContent: chat.title ?? chat.conversation, title: chat.conversation });
+      link.onclick = (e) => {
+        e.preventDefault();
+        ctx.focus(chat.tabId!);
+      };
+      line.append('↳ ', link);
+    } else {
+      line.append(`↳ ${chat.title ?? chat.conversation} `, el('span', { className: 'muted' }, '— not open'));
+    }
+    where.append(line);
+  }
+
+  const approvals = section(
+    'Approvals',
+    s.approvals === 'here'
+      ? el('div', { className: 'line' }, 'Asked in a terminal below, started with ', el('code', {}, '--approve-here'), '.')
+      : s.approvals === 'terminal'
+        ? el('div', { className: 'line' }, 'Asked in the ', el('code', {}, 'bushwhack approvals'), ' terminal.')
+        : el('div', { className: 'line' }, 'Asked in this browser: a notification per change, the whole diff on a click.'),
+  );
+
+  const list = s.terminals ?? [];
+  const terminals = section(`Terminals${list.length ? ` · ${list.length}` : ''}`);
+  terminals.classList.add('wide');
+  if (list.length === 0) terminals.append(el('div', { className: 'line muted' }, 'None follows this chat. bushwhack, in the project\'s folder, opens one.'));
+  for (const t of list) {
+    const row = el(
+      'div',
+      { className: 'terminal' },
+      el('span', { className: `term${t.approves ? ' approving' : ''}` }, '>_'),
+      el('div', { className: 'what' }, el('span', {}, t.label ?? 'a terminal (an older bushwhack)'), el('small', {}, `${t.approves ? 'takes the approvals' : 'follows the chat'}${t.since ? ` · ${since(t.since)}` : ''}`)),
+      closeButton(s, t, ctx),
+    );
+    terminals.append(row);
+  }
+
+  view.append(el('div', { className: 'sections' }, where, approvals, terminals));
+  return view;
 }
 
 /** Bring the list in line with `sessions`, touching only what changed. */

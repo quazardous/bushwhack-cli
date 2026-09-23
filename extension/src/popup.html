@@ -26,8 +26,24 @@
     .version { font-size: 12px; font-weight: 500; color: var(--muted); }
     .links { margin-left: auto; font-size: 12px; color: var(--muted); }
 
-    main { padding: 20px 28px 32px; max-width: 1400px; }
+    main { overflow-x: hidden; }
+    /* Two views side by side: the projects, and the one opened beside them (a project's
+       details, the settings). Opening it slides the projects out to the left. */
+    .views { display: flex; width: 200%; align-items: flex-start; transition: transform .28s ease; }
+    .views.aside { transform: translateX(-50%); }
+    .view { width: 50%; box-sizing: border-box; padding: 20px 28px 32px; }
+    .view > * { max-width: 1400px; }
+    @media (prefers-reduced-motion: reduce) { .views { transition: none; } }
+    .views:not(.aside) #aside, .views.aside #home { visibility: hidden; height: 0; overflow: hidden; }
+    .cog { flex: none; width: 32px; height: 32px; padding: 0; border-radius: 8px; font-size: 18px; line-height: 1; color: var(--muted); }
+    .cog.on { color: var(--accent); border-color: var(--accent); }
     h2 { margin: 26px 0 10px; font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+
+    /* Calls waiting for a yes: answered in their own window, never in this panel over the chat. */
+    #approvals:empty { display: none; }
+    #approvals { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; padding: 12px 16px; border: 1px solid var(--bad); border-left: 4px solid var(--bad); border-radius: 10px; background: var(--card); }
+    #approvals .approval { display: flex; align-items: center; gap: 10px; }
+    #approvals .approval span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* This chat */
     #tab:empty { display: none; }
@@ -54,6 +70,36 @@
       input[type=text].pair-code { background: color-mix(in srgb, var(--accent) 10%, var(--bg)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent); }
       input[type=text].pair-code:focus { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 60%, transparent); }
     }
+
+    /* The terminals following a project's chat: >_, amber when they take the approvals. */
+    .term { padding: 0 5px; border-radius: 4px; font: 600 11px/1.4 ui-monospace, monospace; color: var(--muted); background: var(--bg); border: 1px solid var(--line); }
+    .term.approving { color: #1f2937; background: #fbbf24; border-color: #fbbf24; }
+    .session .terminals { font-size: 13px; }
+    .session .row button.quiet { margin-left: auto; padding: 2px 10px; font-size: 12px; color: var(--muted); }
+
+    /* The view beside the projects: a head, then its sections as cards */
+    .aside-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .aside-head h1 { margin: 0; font-size: 20px; font-weight: 650; }
+    .aside-head .sub { font: 12px ui-monospace, monospace; color: var(--muted); }
+    .sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; max-width: 1100px; }
+    .section { padding: 12px 16px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+    .section.wide { grid-column: 1 / -1; }
+    .section h4 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+    .section a { color: var(--accent); text-decoration: none; }
+    .section a:hover { text-decoration: underline; }
+    .section .line { padding: 3px 0; }
+    .section code { font: 12px ui-monospace, monospace; white-space: nowrap; padding: 1px 4px; border-radius: 4px; background: var(--bg); }
+    .terminal { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+    .terminal:first-of-type { border-top: none; }
+    .terminal .what { display: flex; flex-direction: column; }
+    .terminal .what small { color: var(--muted); font-size: 12px; }
+    .terminal .close { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .arm-note { font-size: 12px; color: var(--bad); }
+    button.power { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 50%; border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); color: var(--bad); background: var(--card); }
+    button.power svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+    button.power:hover { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--card)); }
+    button.power.armed { color: #fff; background: var(--bad); border-color: var(--bad); }
+    button.quiet { color: var(--muted); }
 
     /* Asked before forgetting a pairing: in the panel, not a browser dialog over the chat. */
     .confirm { flex-basis: 100%; max-width: 560px; padding: 10px 14px; border: 1px solid var(--bad); border-radius: 10px; background: color-mix(in srgb, var(--bad) 8%, var(--card)); }
@@ -91,14 +137,19 @@
   <header class="bar">
     <a class="brand" href="https://github.com/quazardous/bushwhack-cli" target="_blank" rel="noopener" title="bushwhack on GitHub"><img class="logo" src="icons/icon.svg" alt="">bushwhack <span id="version" class="version"></span></a>
     <div id="links" class="links"></div>
+    <button id="settings" class="cog" title="Settings" aria-label="Settings">⚙</button>
   </header>
   <main>
-    <section id="tab"></section>
-    <h2>Projects</h2>
-    <div id="sessions" class="muted">Looking…</div>
-    <h2>Settings</h2>
-    <label class="setting"><input type="checkbox" id="autosend"> Send results automatically</label>
-    <div id="error" class="error"></div>
+    <div id="views" class="views">
+      <div id="home" class="view">
+        <section id="approvals"></section>
+        <section id="tab"></section>
+        <h2>Projects</h2>
+        <div id="sessions" class="muted">Looking…</div>
+        <div id="error" class="error"></div>
+      </div>
+      <div id="aside" class="view"></div>
+    </div>
   </main>
   <script src="popup.js"></script>
 </body>

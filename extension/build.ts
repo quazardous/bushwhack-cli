@@ -59,7 +59,8 @@ function manifest(v: string, dev: boolean, key: string): unknown {
     // `alarms` only in development: the heartbeat that keeps the control channel up.
     // `scripting`: re-inject the content script into open chat tabs after an update.
     // `tabGroups`: the app tab of each session sits in a group named after it.
-    permissions: dev ? ['storage', 'scripting', 'tabGroups', 'alarms'] : ['storage', 'scripting', 'tabGroups'],
+    // `notifications`: a call waiting for a yes, with no terminal taking the approvals.
+    permissions: dev ? ['storage', 'scripting', 'tabGroups', 'notifications', 'alarms'] : ['storage', 'scripting', 'tabGroups', 'notifications'],
     // `*.localhost`: the session apps, as the local edge serves them (page:* tools).
     // The CDNs a chat serves its generated pictures from: image:save reads them there.
     host_permissions: ['http://127.0.0.1/*', 'http://*.localhost/*', ...matches, ...DRIVERS.flatMap((d) => (d.imageHosts ?? []).map((h) => `https://*.${h}/*`))],
@@ -90,6 +91,7 @@ const buildOptions = (control: DevControl | undefined): esbuild.BuildOptions => 
     content: join(here, 'src/content.ts'),
     'page-hook': join(here, 'src/page-hook.ts'),
     popup: join(here, 'src/popup.ts'),
+    approve: join(here, 'src/approve.ts'),
     // Injected into the app tab only: the recorder by a registered content script, the
     // screenshot renderer on demand.
     'page-recorder': join(here, 'src/page-recorder.ts'),
@@ -129,6 +131,8 @@ async function statics(control: DevControl | undefined): Promise<void> {
   await writeFile(join(dist, 'manifest.json'), JSON.stringify(manifestJson, null, 2) + '\n');
   await copyFile(join(here, 'src/popup.html'), join(dist, 'popup.html'));
   await copyFile(join(here, 'src/popup.html'), join(dist, 'frame.html'));
+  await copyFile(join(here, 'src/approve.html'), join(dist, 'approve.html'));
+  await copyFile(join(here, 'src/hint.html'), join(dist, 'hint.html'));
   await mkdir(join(dist, 'icons'), { recursive: true });
   for (const icon of ['icon-16.png', 'icon-32.png', 'icon-48.png', 'icon-128.png', 'icon.svg']) await copyFile(join(here, 'icons', icon), join(dist, 'icons', icon));
 }
@@ -187,10 +191,12 @@ async function main(): Promise<void> {
   // reach the build at the next script change. (A change to this file — the manifest — needs
   // the watcher restarted.)
   let pending: ReturnType<typeof setTimeout> | undefined;
-  fsWatch(join(here, 'src/popup.html'), () => {
-    clearTimeout(pending);
-    pending = setTimeout(() => void ctx.rebuild().catch(() => undefined), 150);
-  });
+  for (const page of ['src/popup.html', 'src/approve.html', 'src/hint.html']) {
+    fsWatch(join(here, page), () => {
+      clearTimeout(pending);
+      pending = setTimeout(() => void ctx.rebuild().catch(() => undefined), 150);
+    });
+  }
   console.log(`watching; built into ${dist}; dev control relay on ws://127.0.0.1:${control.port}`);
 }
 

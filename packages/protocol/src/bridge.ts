@@ -50,12 +50,21 @@ export interface ToolsCallRequest {
    */
   conversation: string;
   /** The raw text of each call block, in page order. The daemon parses; it trusts nothing. */
-  calls: string[];
+  calls: (string | RefusedCall)[];
   /**
    * The pictures the chat generated in this conversation, the latest first — sent along
    * only when a call is `image:save`, which picks one of them.
    */
   pictures?: Picture[];
+}
+
+/**
+ * A call the page will not have run — its text reached the page altered (the chat's copy
+ * dropped part of it) — with what to tell the model. The daemon answers it, runs nothing.
+ */
+export interface RefusedCall {
+  id: string | null;
+  error: string;
 }
 
 /** A picture read off the chat's page: its bytes as a data: URL, and its size as shown. */
@@ -108,7 +117,58 @@ export const CHAT = {
    */
   who: 'chat:who',
   reply: 'chat:reply',
+  /**
+   * service → extensions: the terminals following a project's chat, and where its approvals
+   * go ({@link ChatTerminals}) — when that changes, and in answer to each chat:here.
+   */
+  terminals: 'chat:terminals',
+  /** extension → service: close this terminal of the project (asked in the panel, confirmed there). */
+  closeTerminal: 'chat:close-terminal',
 } as const;
+
+export interface ChatTerminals {
+  session: string;
+  /** How many `bushwhack` terminals follow the project's chat. */
+  terminals: number;
+  /** `here`: a terminal following the chat takes them (--approve-here); `terminal`: `bushwhack approvals`; `browser`. */
+  approvals: 'here' | 'terminal' | 'browser';
+  /** Each of them: its node, whether it takes the approvals, what it said of itself (pid, tty), since when. */
+  list?: { id: string; approves: boolean; label?: string; since: number }[];
+}
+
+/**
+ * Approvals in the browser: a call waiting for the operator's yes while no terminal takes
+ * the approvals (`bushwhack --approve-here`, `bushwhack approvals`). Only the service asks;
+ * only the extension's worker answers — from a click on its notification or on its own
+ * approval page, never from a chat page.
+ */
+export const APPROVAL = {
+  /** service → extension: a call to approve ({@link ApprovalRequest}); answered with {@link APPROVAL.reply}. */
+  ask: 'approval:ask',
+  /** extension → service: `{ verdict, remember? }` — remember: a pattern of `scopes`, or true for the whole tool. */
+  reply: 'approval:reply',
+  /** service → extension: that call needs no answer any more (answered elsewhere, or timed out). */
+  done: 'approval:done',
+  /** service → extension: a line for the operator (a secret value to type in a terminal). */
+  notice: 'approval:notice',
+} as const;
+
+export interface ApprovalRequest {
+  project: string;
+  /** The call's id in the chat (`c12`). */
+  id: string;
+  tool: string;
+  /** The file it touches, when it touches one. */
+  path?: string;
+  /** What it would do: the diff of a write, the command of an app call. */
+  text: string;
+  /** What the answer may be remembered for, narrowest first: a pattern of paths, or the whole tool (none). */
+  scopes?: { label: string; pattern?: string }[];
+  /** The scope offered ticked (its index), when one is: "this file", for a change. */
+  preset?: number;
+}
+
+export type ApprovalVerdict = 'yes' | 'no';
 
 export interface ChatSendRequest {
   /** The session's node id: which project's chat. */

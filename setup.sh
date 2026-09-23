@@ -2,10 +2,13 @@
 # Sets bushwhack up from a clone: dependencies, the extension, and the `bushwhack` command
 # on your PATH. Safe to run again (after a pull, for instance). Needs no root.
 #
-#   ./setup.sh                 # links the command into ~/.local/bin
+#   ./setup.sh                 # links the command into ~/.local/bin; standalone by default:
+#                              # no Docker, no octopod — the chat's app is the project's files
+#                              # served as they are, nothing run
 #   ./setup.sh --dev           # the same, for development: no production extension build
-#   ./setup.sh --standalone    # a minimal install: no Docker, no octopod — the chat's app is
-#                              # the project's files served as they are, nothing run
+#   ./setup.sh --use-octopod   # the app in its containers instead, through octopod (Docker):
+#                              # a dev server, databases
+#   ./setup.sh --no-gnome      # without the GNOME Shell indicator (installed when GNOME runs)
 #   BIN_DIR=~/bin ./setup.sh   # … or elsewhere
 #
 # The command is a link to bin/bushwhack, which runs the sources: a change to the code
@@ -16,11 +19,15 @@ set -euo pipefail
 
 DEV=0
 STANDALONE=0
+USE_OCTOPOD=0
+NO_GNOME=0
 for arg in "$@"; do
   case "$arg" in
     --dev) DEV=1 ;;
     --standalone) STANDALONE=1 ;;
-    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
+    --use-octopod) USE_OCTOPOD=1 ;;
+    --no-gnome) NO_GNOME=1 ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
     *) echo "unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -64,18 +71,20 @@ case ":$PATH:" in
   *) warn "$BIN_DIR is not on your PATH: add  export PATH=\"$BIN_DIR:\$PATH\"  to your shell's profile" ;;
 esac
 
+# Standalone unless octopod is asked for; a mode chosen before is kept across runs.
 [ "$STANDALONE" = 1 ] && "$ROOT/bin/bushwhack" mode standalone >/dev/null
+[ "$USE_OCTOPOD" = 1 ] && "$ROOT/bin/bushwhack" mode octopod >/dev/null
 MODE="$("$ROOT/bin/bushwhack" mode | awk '{print $1}' | tr -d ':')"
 
 if [ "$MODE" = standalone ]; then
   say "Web app: standalone"
   echo "  the chat's app is the project's files served as they are, at http://<project>.localhost:<port>/:"
   echo "  HTML, CSS and JavaScript in the browser, nothing run on this machine — no Docker, no octopod"
-  echo "  (for an app in containers, with a dev server and databases: bushwhack mode octopod)"
+  echo "  (for an app in containers, with a dev server and databases: ./setup.sh --use-octopod)"
 else
   say "Web app tools (optional)"
   if ! command -v docker >/dev/null; then
-    warn "Docker is not installed: the chat will get the file and secret tools only (./setup.sh --standalone: its files served as a site instead)"
+    warn "Docker is not installed: octopod mode needs it (./setup.sh --standalone: the project's files served as a site instead)"
   elif ! docker compose version >/dev/null 2>&1; then
     warn "Docker Compose v2 (docker compose) is missing: the app tools need it"
   elif [ -n "${BUSHWHACK_OCTOPOD:-}" ] || command -v octopod >/dev/null; then
@@ -92,6 +101,25 @@ else
     warn "octopod is not on your PATH (nor BUSHWHACK_OCTOPOD set): the app tools stay off until it is"
     echo "  to install it:  npm i -g @quazardous/octopod && octopod setup   (not \`octopod\` alone: another project on npm)"
   fi
+fi
+
+# The top bar indicator, when GNOME Shell is there: projects and their chats, a terminal
+# in a project, the pairing code, the mode — the counterpart of the Windows tray.
+if [ "$NO_GNOME" = 0 ] && command -v gnome-shell >/dev/null && command -v gnome-extensions >/dev/null; then
+  say "GNOME Shell indicator"
+  UUID=bushwhack@quazardous.github.io
+  EXT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions"
+  mkdir -p "$EXT_DIR"
+  fresh=0; [ -e "$EXT_DIR/$UUID" ] || fresh=1
+  ln -sfn "$ROOT/gnome/$UUID" "$EXT_DIR/$UUID"
+  echo "  $EXT_DIR/$UUID → $ROOT/gnome/$UUID"
+  if gnome-extensions enable "$UUID" 2>/dev/null; then
+    echo "  enabled"
+  else
+    fresh=1
+  fi
+  # GNOME Shell finds a new extension when it starts: under Wayland, at the next login.
+  [ "$fresh" = 1 ] && warn "log out and back in for GNOME Shell to find it, then: gnome-extensions enable $UUID"
 fi
 
 if [ "$DEV" = 1 ]; then
@@ -114,5 +142,5 @@ $(say "Done. Next:")
   4. On a meta.ai or Gemini conversation, open the bushwhack popup: pair once with the code
      bushwhack list shows, then "Use for this chat" and "Insert the tools manifest".
 
-  More: $ROOT/docs/QUICKSTART.md
+  More: $ROOT/docs/guide.md
 EOF

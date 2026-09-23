@@ -116,6 +116,25 @@ describe('PageController', () => {
     expect(await tabs.get('session:demo')).toBe(42);
   });
 
+  it('takes back the app tab still in the group when its memory is gone, for any action', async () => {
+    // The extension was reloaded: its table of tabs is empty, the app's tab is still there.
+    browser.tabs.set(7, { id: 7, url: 'http://demo.localhost/list' });
+    browser.inGroup = 7;
+    browser.onRun = () => ({ ok: true, data: 'clicked <button>' });
+    expect(await page.run(request('click', { selector: '#go' }))).toMatchObject({ status: 'ok' });
+    expect(await tabs.get('session:demo')).toBe(7);
+  });
+
+  it('says why no page is open, and what brings it back', async () => {
+    await page.run(request('open', { path: '/standalone/index.html' }));
+    browser.tabs.clear();
+    tabs.map.clear();
+    expect(await page.run(request('click', { selector: '#go' }))).toMatchObject({
+      status: 'error',
+      content: expect.stringMatching(/its tab was closed\. page:open \/standalone\/index\.html brings it back/),
+    });
+  });
+
   it('refuses to act before a page is open', async () => {
     expect(await page.run(request('snapshot'))).toMatchObject({ status: 'error', content: expect.stringMatching(/page:open first/) });
   });
@@ -175,5 +194,13 @@ describe('PageController', () => {
 
   it('says there is no app when the session has none', async () => {
     expect((await page.run({ ...request('open'), origins: [] })).content).toMatch(/app:create first/);
+  });
+});
+
+describe('the page:* tools and the actions the extension accepts', () => {
+  it('are the same list: a new tool cannot be refused as malformed', async () => {
+    const { PAGE_TOOLS } = await import('./tools.js');
+    const { PAGE_ACTIONS } = await import('./types.js');
+    expect(PAGE_TOOLS.map((t) => t.name.slice('page:'.length)).sort()).toEqual([...PAGE_ACTIONS].sort());
   });
 });

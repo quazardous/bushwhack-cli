@@ -7,7 +7,7 @@
  * protocol testable without a browser.
  */
 import { randomBytes } from 'node:crypto';
-import { realpath } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
@@ -16,22 +16,27 @@ import { CALL_KEY, END_LINE } from '@bushwhack/protocol';
 import { connectBridge } from './bridge-client.js';
 import { AlreadyServing, serve, VERSION } from './serve.js';
 import { describeSession, readEndpoint } from './session.js';
-import { readHidden } from './approval.js';
+import { askTerminal, readHidden } from './approval.js';
 import { DEFAULT_INSTANCE, INSTANCE_NAME, listInstances, startService, SERVICE, SERVICE_NODE, type ProjectEntry, type ServiceFile } from './service.js';
 import { answers, ensureService, operatorClient } from './service-client.js';
-import { runChatOnce, runChatTerminal, styleFor } from './chat-terminal.js';
+import { ruleLines, runChatOnce, runChatTerminal, styleFor, type RulesReply } from './chat-terminal.js';
+import type { Scope } from './approval-rules.js';
 import { listReports, markReport, type ListedReport } from './reports.js';
 import { APP_MODES, configFile, readMode, writeMode, type AppMode } from './mode.js';
 import { banner } from './banner.js';
 
 const USAGE = `bushwhack ${VERSION}
 
-  bushwhack                        here: share this folder (asked the first time), then answer
-                                   approvals for every project in this terminal
+  bushwhack                        here: share this folder (asked the first time), then talk
+                                   to its chat; approvals are asked in the browser
+  bushwhack --approve-here         the same, the approvals asked in this terminal — this
+                                   project's, and the others' when no other terminal takes them
   bushwhack add [folder]           let web chats work on this folder (the current one by default)
   bushwhack remove [folder]        stop that
   bushwhack list [--json]          the projects, and the pairing code
   bushwhack approvals              answer the service's approval requests, in this terminal
+  bushwhack approvals --always     the answers remembered, per project (--forget <rule|pattern|tool|all>)
+  bushwhack approvals --log        each project's last decisions: who said yes or no, to what
   bushwhack daemon                 run the service in the foreground (systemd runs this)
   bushwhack instances              the service's instances: running or not, projects, browsers
   bushwhack reports [--all] [--new] [--json]
@@ -66,6 +71,8 @@ const WARNING = [
 let asked: string | undefined = process.env.BUSHWHACK_INSTANCE || undefined;
 /** `--yolo`: every approval this terminal gets is a yes, without asking. */
 let yolo = false;
+/** `--approve-here`: the chat terminal takes the approvals, instead of the browser. */
+let approveHere = false;
 
 /** The instance a folder is active in, when it is in one. */
 async function instanceOf(folder: string): Promise<string | undefined> {
@@ -99,7 +106,7 @@ function printProjects(projects: ProjectEntry[], code: string, approvalsHint = t
     console.log(`  ${style.bold(p.session.padEnd(20))} ${style.dim(p.folder)}\n  ${pad} ${chat}\n  ${pad} ${style.dim(`app: ${p.app}`)}`);
   }
   console.log(`\n  pairing code  ${style.cyan(style.bold(code))}   ${style.dim('← lets a browser\'s extension in: typed once per browser, in the bushwhack panel (never in a chat)')}`);
-  if (approvalsHint) console.log('  approvals     bushwhack approvals   ← keep it open in a terminal');
+  if (approvalsHint) console.log(`  approvals     ${style.dim('in the browser, as notifications — or in a terminal: bushwhack --approve-here in a project, bushwhack approvals for all')}`);
 }
 
 async function runAdd(folder: string): Promise<void> {
@@ -213,7 +220,7 @@ async function runHere(): Promise<void> {
     if (here === homedir() || here === '/') {
       console.log(`  ${here} is not shared: a chat would read all of it. Run bushwhack in a project folder, or bushwhack add <folder>.`);
     } else {
-      console.log(['', `  ${here} is not shared with web chats yet.`, '', ...WARNING, '  Writes, edits, moves and deletes will wait for your yes, here.', ''].join('\n'));
+      console.log(['', `  ${here} is not shared with web chats yet.`, '', ...WARNING, '  Writes, edits, moves and deletes will wait for your yes.', ''].join('\n'));
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       const answer = (await rl.question('  Share this folder with web chats? [y/N] ')).trim().toLowerCase();
       rl.close();
@@ -237,13 +244,40 @@ async function runHere(): Promise<void> {
   printProjects(projects, code, false);
   if (mine) {
     console.log('');
-    await runChatTerminal({ file, project: mine, stateDir: join(here, '.bushwhack'), yolo });
+    await runChatTerminal({ file, project: mine, stateDir: join(here, '.bushwhack'), yolo, approveHere });
     process.exit(0);
   }
   await runApprovals();
 }
 
 /** The operator's terminal for approvals: one question at a time, whatever the project. */
+/**
+ * `approvals --always`: the tools answered "always", per project (until the service
+ * restarts); `--forget <tool|all>`: ask them again; `--log`: each project's decisions.
+ */
+async function runApprovalRules(rest: string[]): Promise<void> {
+  await withOperator(async (client) => {
+    if (rest.includes('--log')) {
+      const { projects } = (await client.list()) as { projects: ProjectEntry[] };
+      for (const p of projects) {
+        const lines = (await readFile(join(describeSession(p.folder).stateDir, 'approvals.jsonl'), 'utf8').catch(() => '')).split('\n').filter(Boolean);
+        if (!lines.length) continue;
+        console.log(`  ${p.session}`);
+        for (const l of lines.slice(-20)) {
+          const d = JSON.parse(l) as { at: string; id: string; tool: string; path?: string; verdict: string; by: string; rule?: string };
+          console.log(`    ${d.at.slice(0, 19).replace('T', ' ')}  ${d.verdict === 'yes' ? '✓' : '✗'} ${d.id} ${d.tool}${d.path ? ` ${d.path}` : ''}  (${d.by}${d.rule ? `: ${d.rule}` : ''})`);
+        }
+      }
+      return;
+    }
+    const i = rest.indexOf('--forget');
+    // What to forget: a rule as listed (`change **/*.js`), a pattern, a tool — or all.
+    const named = i >= 0 ? rest.slice(i + 1).join(' ').trim() : '';
+    const forget = i >= 0 ? (named && named !== 'all' ? named : true) : undefined;
+    console.log(ruleLines((await client.always(undefined, forget)) as unknown as RulesReply, true).join('\n'));
+  });
+}
+
 async function runApprovals(): Promise<void> {
   const file = await reached();
   const client = await operatorClient(file, `approvals:${randomBytes(4).toString('hex')}`, {
@@ -262,14 +296,15 @@ async function runApprovals(): Promise<void> {
   };
   client.node.on(SERVICE.notice, (payload: unknown, envelope) => {
     if (envelope.source !== SERVICE_NODE) return;
-    const p = payload as { project?: unknown; text?: unknown };
+    const p = payload as { project?: unknown; text?: unknown; approval?: unknown };
+    if (p.approval === true) return console.log(`  ${String(p.project)}: ${String(p.text)}`);
     console.log(`\n  ${String(p.project)}: ${String(p.text)}  (bushwhack reports)`);
   });
   if (yolo) console.log('  --yolo: every approval is a yes, without asking — writes, deletes, app commands. Secret values are still yours to type.\n');
   client.node.on(SERVICE.approve, (payload: unknown, envelope) => {
-    const p = payload as { project: string; id: string; tool: string; text: string };
+    const p = payload as { project: string; id: string; tool: string; text: string; scopes?: Scope[] };
     if (yolo) {
-      answer(envelope, { verdict: 'yes' });
+      answer(envelope, { verdict: 'yes', yolo: true });
       process.stdout.write(`\n┌ yolo ${p.project} · ${p.id} ${p.tool}\n${String(p.text).replace(/^/gm, '│ ')}\n└ accepted\n`);
       return;
     }
@@ -277,12 +312,7 @@ async function runApprovals(): Promise<void> {
       process.stdout.write(`\n┌ ${p.project} · ${p.id} ${p.tool}\n${String(p.text).replace(/^/gm, '│ ')}\n`);
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       try {
-        for (;;) {
-          const a = (await rl.question(`└ approve? [y]es / [n]o / [a]lways ${p.tool} for ${p.project}: `)).trim().toLowerCase();
-          if (['y', 'yes'].includes(a)) return answer(envelope, { verdict: 'yes' });
-          if (['n', 'no'].includes(a)) return answer(envelope, { verdict: 'no' });
-          if (['a', 'always'].includes(a)) return answer(envelope, { verdict: 'always' });
-        }
+        answer(envelope, { ...(await askTerminal((prompt) => rl.question(prompt), (text) => process.stdout.write(text), p.scopes)) });
       } finally {
         rl.close();
       }
@@ -436,6 +466,10 @@ async function main(argv: string[]): Promise<void> {
     if (!asked || !INSTANCE_NAME.test(asked)) throw new Error('--instance takes a name (a-z, 0-9 and -)');
     argv = [...argv.slice(0, at), ...argv.slice(at + 2)];
   }
+  if (argv.includes('--approve-here')) {
+    approveHere = true;
+    argv = argv.filter((a) => a !== '--approve-here');
+  }
   if (argv.includes('--yolo')) {
     yolo = true;
     argv = argv.filter((a) => a !== '--yolo');
@@ -454,7 +488,7 @@ async function main(argv: string[]): Promise<void> {
     case 'list':
       return runList(rest);
     case 'approvals':
-      return runApprovals();
+      return rest.some((a) => ['--always', '--forget', '--log'].includes(a)) ? runApprovalRules(rest) : runApprovals();
     case 'daemon':
       return runDaemon();
     case 'instances':

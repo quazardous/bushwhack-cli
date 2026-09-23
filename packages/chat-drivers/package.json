@@ -1,6 +1,6 @@
 {
   "name": "@bushwhack/chat-drivers",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Declarative per-chat drivers: read bushwhack calls from a chat page, answer into its composer",
   "license": "MIT",
   "author": "David Berlioz",
@@ -23,6 +23,6 @@
   },
   "dependencies": {
     "zod": "^3.23.8",
-    "@bushwhack/protocol": "0.1.0"
+    "@bushwhack/protocol": "0.3.0"
   }
 }

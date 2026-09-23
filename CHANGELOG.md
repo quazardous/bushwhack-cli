@@ -20,8 +20,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-23
+
 ### Added
 
+- The panel shows the `bushwhack` terminals following each project's chat (`>_`, amber when they take its approvals). A project's **Details** slide in beside the list: its app and chats, where its approvals go, and each terminal — its pid and tty, since when — with a red power button that closes it on a second click. The terminal says it was closed from the panel.
+- The panel's settings open the same way, from the cog at the top right.
+- `!command` in the chat terminal runs it in the project's folder with your shell — its output shows as it comes — then sends the command and its output to the chat, the project's declared secrets masked in it.
+
+### Changed
+
+- Clicking the bushwhack icon outside a chat shows a few lines saying what to do — open a conversation on Meta AI, Gemini or ChatGPT and click the icon there — with a link to the full panel, instead of opening the panel in a tab.
+
+### Fixed
+
+- A call waiting for a yes in the browser is no longer lost when the extension is reloaded or updated: the service asks the browser again when it comes back. It used to wait ten minutes for an answer nobody could give, the page stuck on "running 1 call…".
+- While a call waits, the page still reports the model's answer to the terminal and keeps its status bar current (the terminals following it); a copy of the page's script left behind by an extension reload removes itself, and its bar no longer stays up over the new one.
+
+## [0.2.0] - 2026-09-23
+
+### Added
+
+- Approvals in the browser: a notification per call waiting for a yes, the icon's badge counting them, the panel listing them, and an approval page with the whole diff. Only a click on the notification or on that page answers — never the chat page, nor the panel over it. A secret value is still typed in a terminal only. Each decision is logged as the browser's.
+- `docs/cli.md`: every `bushwhack` command and option.
+- The chat page's status bar shows `>_` when a `bushwhack` terminal follows the chat — in amber when the approvals are asked in a terminal (`--approve-here`, or `bushwhack approvals`); its tooltip says which.
+- **Remembered answers, by pattern.** A yes or a no can be remembered for this file, its kind of file in its folder (`src/*.js`), its kind anywhere (`**/*.js`) or every file — offered from the call's path, in the browser's approval window (*this file* ticked for a change) and in the terminal (`r`). A remembered no refuses at once and tells the model why. The rules are kept in the project's `.bushwhack/approval-rules.json`: across restarts, editable by hand, out of the model's reach; `/always` and `bushwhack approvals --always` list them, `--forget` takes them back. An "always" no longer ends with the service.
+- Approvals leave a trace: every decision — yours, an "always" rule's, `--yolo`'s, or nobody answering — goes to the project's `.bushwhack/approvals.jsonl` (`bushwhack approvals --log`). A call accepted by an "always" rule is shown in the terminal as it passes, and `/always` in a chat terminal (`bushwhack approvals --always`, `--forget <tool|all>`) lists the rules and forgets them.
+- `page:storage`: what the app's page keeps in the browser — localStorage and sessionStorage keys, IndexedDB databases and stores, a key's value, a store's first entries. Read only: the way to check the data of an app with no server.
+- GNOME: bushwhack in the top bar, the counterpart of the Windows tray — the adventurer, grey while the service is stopped; the projects with the chat each is live in, a terminal in a project, its app and its folder; the pairing code to copy, an approvals terminal, the mode (after asking), starting the service. A view: it never starts the service by looking. `setup.sh` installs and enables it where GNOME Shell runs (`--no-gnome` does not).
 - A minimal install, without Docker or octopod: `./setup.sh --standalone` (`.\setup.ps1 -Standalone` on Windows). The chat's app is then the project's own files, served as they are at `http://<project>.localhost:47320/`, and the `page:*` tools look at it. Nothing of the project runs on the machine, and only what `fs:read` reads is served — never `.git/`, `.bushwhack/`, an ignored file or a declared secret file. The chat is told to build what works in the browser alone (its data in the page: localStorage, IndexedDB, or SQLite through WebAssembly). Chosen at setup, never a fallback: `bushwhack mode` says the mode, `bushwhack mode octopod|standalone` changes it.
 - Windows: `setup.ps1` sets bushwhack up in PowerShell — dependencies, the extension, the `bushwhack` command on the PATH (PowerShell, cmd and Git Bash). The service runs as a background process; the app tools work with Docker Desktop and an octopod that has its Windows fixes.
 - `page:open` says how the load went: the console errors and the failed requests, the first few of each — a script or a stylesheet missing, a CDN unreachable, now recorded too — or that there were none. The model no longer has to ask page:console and page:network blind.
@@ -32,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Approvals are asked in the browser by default.** `bushwhack` in a project's folder no longer asks them in its terminal: a notification does, with Yes and No, and a click on it opens the whole change with Yes / No and what to remember the answer for. The terminal says where each one stands. `bushwhack --approve-here` asks them in the terminal as before (`--yolo` too); `bushwhack approvals` still takes every project's.
+- The README walks through a first project without assuming you are a developer: download the ZIP, each command to type, what to answer, where to see the page.
+- **Standalone is the default mode.** A fresh install serves each project's files as they are, with nothing else to install; the app in containers, through octopod and Docker, is chosen with `./setup.sh --use-octopod` (`.\setup.ps1 -UseOctopod`) or `bushwhack mode octopod`. An install that had chosen a mode keeps it.
+- The README is the quickstart now — what it looks like, how it works, four steps, what the model can do; the rest of the documentation moved to `docs/guide.md` and `docs/troubleshooting.md` (`docs/QUICKSTART.md` is gone).
 - Once the operator says no to a call, the calls after it in the same answer are not run (`status: skipped`, naming the refused one): they may have depended on it, and would only have put more questions. Sent again, they run.
 - The panel's *Forget* is the service's, next to "this browser is paired", and asks first — in the panel, saying which service, how many projects go with it, and that their chats are unbound. It sat on every project, though it always forgot the whole service.
 - *Send results automatically* is ticked by default: results go back to the chat without a click per round. A browser where it was unticked keeps it unticked.
@@ -39,6 +69,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A call waiting for a yes in another terminal (`--approve-here`, `bushwhack approvals`) no longer looks stuck in the project's other terminals: they say where it waits, then the answer.
+- The GNOME top bar and the Windows tray mark octopod mode, now the unusual one, instead of standalone; the Windows tray no longer takes a fresh install for octopod mode.
+- meta.ai's copy of an answer drops letter-and-digit tokens in brackets (`[t1]`, `[x2]`), even in code: calls arrived altered — a file written with `db.transplants=;` for `db.transplants=[t1];`, an edit approved as a no-op. A call read through a chat's copy is now checked against the same block as the page shows it; if the copy lost characters, the call is not run and the model is told what was lost and how to write it (`[ t1 ]`). The meta.ai notes say so up front.
+- A request the extension sends again after a failure no longer announces its calls again: the terminal showed the same call every second, and the counters and the history counted it each time.
+- An answer made of calls only no longer shows "the model answered, with nothing to read" in the terminal: its calls show themselves.
+- The workspace jail on Windows: names NTFS reads as another name are refused — an NTFS stream (`.env::$DATA`), a trailing dot or space (`.git.`), a device (`NUL`, `con.txt`), a short 8.3 name (`BUSHWH~1`) — and `.git` and `.bushwhack` stay hidden under any case (`.GIT/config`), on every system.
+- `page:*` finds the app's tab again after the extension is reloaded (or its worker restarted), instead of "no page is open" with the tab still there; when the tab was closed, it says so and which `page:open` brings it back.
+- `page:storage` was refused by the extension as a malformed request: the extension now accepts exactly the page tools' own list of actions.
+- `page:snapshot` keeps text in inline markup: a name in `<b>`, a word in `<em>` inside a sentence were left out, only the text of leaf elements was read. A run of text now gives its whole line, once, a line break read as a space.
+- The panel's ↑/↓ counters count all the calls and results of a conversation; they stopped at 50 each, the size of the history kept.
+- The panel opened by a copy of the extension that was since reloaded says to reload the page, instead of failing on its first call.
 - `setup.sh` and `setup.ps1` took an install in standalone mode for an octopod one, and checked Docker and octopod: they read the mode with its colon.
 - A terminal opened while its project's chat was in a background tab said "no browser has its chat open", and kept saying so though the chat worked: the service knew of open chats only from a heartbeat a hidden tab sends about once a minute, and a chat back after going silent was not announced again. A terminal that opens now asks the browsers at once which chats they show (`chat:who`), and a chat back after a silence is announced to the terminals.
 - The first command right after the service started could wait two minutes for nothing: /health named the service as soon as its relay listened, before the service listened on it. It names it once the service answers.

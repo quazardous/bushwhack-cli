@@ -8,7 +8,7 @@
  * never runs the past: calls already in a conversation when it was bound are marked
  * handled first.
  */
-import { blockText, callsInMarkdown, callsInTurn, conversationId, DRIVERS, findCalls, finishedTurns, mayHoldCalls, readComposer, selectDriver, send, writeToComposer, attachImages, type FoundCall } from '@bushwhack/chat-drivers';
+import { blockText, callsInMarkdown, callsInTurn, crossCheck, conversationId, DRIVERS, findCalls, finishedTurns, mayHoldCalls, readComposer, selectDriver, send, writeToComposer, attachImages, type FoundCall } from '@bushwhack/chat-drivers';
 import { Arrival } from './arrival.js';
 import { isCallBlock, removeWithFrame } from './answer-text.js';
 import { PanelOverlay } from './panel-overlay.js';
@@ -90,7 +90,8 @@ async function callsOf(turn: Element): Promise<FoundCall[]> {
     // the turn, the next tick tries again.
     const markdown = await copyTurn(turn);
     if (markdown === undefined) return [];
-    calls = callsInMarkdown(markdown);
+    // The copy is the call; the render only checks it lost nothing on the way.
+    calls = crossCheck(callsInMarkdown(markdown), callsInTurn(turn, driver));
   } else {
     calls = callsInTurn(turn, driver);
   }
@@ -122,6 +123,9 @@ async function latestCalls(): Promise<FoundCall[]> {
 const answeredAgain = new Set<string>();
 /** How many answers the page held when this one's calls were last handled. */
 let answeredUpTo = -1;
+
+/** Calls already announced to the terminal and counted: a retry is not announced again. */
+const announced = new Set<string>();
 
 function keyOf(found: FoundCall): string {
   return `${found.kind === 'call' ? found.call.id : '?'}:${fnv(found.text)}`;
@@ -166,10 +170,22 @@ async function loadHistory(conv: string): Promise<HistoryEntry[]> {
   return (got[historyKey(conv)] as HistoryEntry[] | undefined) ?? [];
 }
 
+/** Calls and results of a conversation in all — its history keeps the last HISTORY only. */
+const totalsKey = (conv: string): string => `totals:${conv}`;
+
+async function loadTotals(conv: string, history: HistoryEntry[]): Promise<{ up: number; down: number }> {
+  const got = (await chrome.storage.local.get(totalsKey(conv)))[totalsKey(conv)] as { up: number; down: number } | undefined;
+  // A conversation from before the totals were kept: its history is all there is to count.
+  return got ?? { up: history.filter((e) => e.dir === 'up').length, down: history.filter((e) => e.dir === 'down').length };
+}
+
 async function record(conv: string, entries: HistoryEntry[]): Promise<void> {
-  const all = [...(await loadHistory(conv)), ...entries].slice(-HISTORY);
-  await chrome.storage.local.set({ [historyKey(conv)]: all });
-  bar.setHistory(all);
+  const before = await loadHistory(conv);
+  const totals = await loadTotals(conv, before);
+  for (const entry of entries) totals[entry.dir] += 1;
+  const all = [...before, ...entries].slice(-HISTORY);
+  await chrome.storage.local.set({ [historyKey(conv)]: all, [totalsKey(conv)]: totals });
+  bar.setHistory(all, totals);
 }
 
 /** The argument that says what a call is about, for the history. */
@@ -183,6 +199,13 @@ function detailOf(found: FoundCall): string | undefined {
 
 let running = false;
 let loop: ReturnType<typeof setInterval> | undefined;
+/**
+ * The calls sent and not answered yet. They run beside the loop, not inside it: a call may
+ * wait minutes for a yes, and meanwhile the page still reports the model's answer to the
+ * terminal, the bar still shows what is going on — and a copy the extension left behind
+ * (reloaded under the page) still notices it is one.
+ */
+let inFlight: { count: number } | undefined;
 
 /**
  * The extension was reloaded or updated under this page: this copy of the script is an
@@ -433,6 +456,9 @@ function watchAnswer(conv: string): void {
   }
   if (key === answerSeen) return;
   answerSeen = key;
+  // An answer made of calls only has nothing to show: its calls show themselves, and "nothing
+  // to read" would be wrong. Only a finished answer with no text, no call and no picture says so.
+  if (shown === '' && [...last.querySelectorAll(driver.transcript.blocks)].some((b) => isCallBlock(b.textContent ?? ''))) return;
   report(conv, { kind: 'answer', text: shown, done });
 }
 
@@ -471,6 +497,7 @@ async function tick(): Promise<void> {
     // Nothing is added to the page until it has hydrated — its editor is the sign. Touching
     // the DOM earlier can derail the chat's own rendering.
     if (readComposer(document, driver) === undefined) return;
+    bar.setTerminals(status.terminals);
     if (status.elsewhere) {
       // Should this tab act again, the other will have moved on: it starts over from the history.
       viewing = undefined;
@@ -486,7 +513,8 @@ async function tick(): Promise<void> {
       answeredUpTo = -1;
       answeredAgain.clear();
       awaitingSend = false;
-      bar.setHistory(conv ? await loadHistory(conv) : []);
+      const history = conv ? await loadHistory(conv) : [];
+      bar.setHistory(history, conv ? await loadTotals(conv, history) : undefined);
     }
     // The chat finished an answer but shows it blank: its calls cannot be read. Once, and
     // only with nothing of ours or the operator's in the message box, reload to read it.
@@ -527,6 +555,10 @@ async function tick(): Promise<void> {
       return;
     }
     watchAnswer(conv);
+    if (inFlight) {
+      show(`running ${inFlight.count} call${inFlight.count > 1 ? 's' : ''}…`, 'busy');
+      return;
+    }
 
     const done = await handled(conv);
     let fresh = (await pageCalls()).filter((found) => !done.has(keyOf(found)));
@@ -550,13 +582,33 @@ async function tick(): Promise<void> {
       return;
     }
 
+    inFlight = { count: fresh.length };
+    void runCalls(conv, fresh).finally(() => (inFlight = undefined));
+  } catch (e) {
+    // The service worker restarted mid-request: the next tick starts over, and replays
+    // are answered from the daemon's store. Or the extension was reloaded: step aside.
+    if (!orphaned()) show(`error: ${(e as Error).message}`, 'error');
+  } finally {
+    running = false;
+  }
+}
+
+/** Send calls and write their results back: beside the loop (see `inFlight`). */
+async function runCalls(conv: string, fresh: Awaited<ReturnType<typeof pageCalls>>): Promise<void> {
+  try {
     show(`running ${fresh.length} call${fresh.length > 1 ? 's' : ''}…`, 'busy');
-    report(conv, {
-      kind: 'calls',
-      items: fresh.map((f) => (f.kind === 'call' ? { id: f.call.id, tool: f.call.tool, ...(detailOf(f) ? { detail: detailOf(f) } : {}) } : { id: f.id, tool: 'invalid call', detail: f.error })),
-    });
-    bar.transit('up', fresh.length);
-    await record(conv, fresh.map((f) => ({
+    // A request that failed is sent again on the next tick: its calls are announced once —
+    // the terminal, the counter and the history do not count a retry as new calls.
+    const unseen = fresh.filter((f) => !announced.has(keyOf(f)));
+    for (const f of unseen) announced.add(keyOf(f));
+    if (unseen.length) {
+      report(conv, {
+        kind: 'calls',
+        items: unseen.map((f) => (f.kind === 'call' ? { id: f.call.id, tool: f.call.tool, ...(detailOf(f) ? { detail: detailOf(f) } : {}) } : { id: f.id, tool: 'invalid call', detail: f.error })),
+      });
+      bar.transit('up', unseen.length);
+    }
+    if (unseen.length) await record(conv, unseen.map((f) => ({
       at: Date.now(),
       dir: 'up' as const,
       id: f.kind === 'call' ? f.call.id : f.id,
@@ -569,7 +621,9 @@ async function tick(): Promise<void> {
     const reply = (await chrome.runtime.sendMessage({
       type: 'calls',
       conversation: conv,
-      calls: fresh.map((f) => f.text),
+      // A call refused on the page (its text arrived altered) goes as its error: the daemon
+      // answers it, and runs nothing. Other invalid ones go as text: the daemon says why.
+      calls: fresh.map((f) => (f.kind === 'invalid' && f.refused ? { id: f.id, error: f.error } : f.text)),
       ...(pictures.length ? { pictures } : {}),
     } satisfies ContentRequest)) as CallsResponse;
 
@@ -578,6 +632,8 @@ async function tick(): Promise<void> {
       return;
     }
     await markHandled(conv, fresh.map(keyOf));
+    // Answered: a later word-for-word repeat is a new round, announced again.
+    for (const f of fresh) announced.delete(keyOf(f));
     report(conv, {
       kind: 'results',
       items: reply.summary.map((r) => ({ id: r.id, tool: r.tool, status: r.replay ? `${r.status} (replay)` : r.status, ...(r.error ? { detail: r.error } : {}) })),
@@ -602,8 +658,6 @@ async function tick(): Promise<void> {
     // The service worker restarted mid-request: the next tick starts over, and replays
     // are answered from the daemon's store. Or the extension was reloaded: step aside.
     if (!orphaned()) show(`error: ${(e as Error).message}`, 'error');
-  } finally {
-    running = false;
   }
 }
 
@@ -625,7 +679,9 @@ function devCommand(command: TabCommand): unknown {
           if (!shadow) return null;
           const tone = (shadow.querySelector('.dot') as HTMLElement | null)?.dataset.tone ?? '?';
           const rows = [...shadow.querySelectorAll('.row')].map((r) => [...r.children].map((c) => c.textContent).join(' '));
-          return [`[${tone}] ${shadow.querySelector('.text')?.textContent ?? ''} ${shadow.querySelector('.io')?.textContent ?? ''}`, ...rows].join('\n');
+          const term = shadow.querySelector('.term') as HTMLElement | null;
+          const mark = term && !term.hidden ? ` [${term.textContent}${term.classList.contains('approving') ? ' amber' : ''}: ${term.title}]` : '';
+          return [`[${tone}] ${shadow.querySelector('.text')?.textContent ?? ''}${mark} ${shadow.querySelector('.io')?.textContent ?? ''}`, ...rows].join('\n');
         })(),
         turns: turns.map((turn) => ({
           done: driver.transcript.assistantTurnDone ? turn.matches(driver.transcript.assistantTurnDone) : true,

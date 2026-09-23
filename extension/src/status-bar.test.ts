@@ -54,4 +54,41 @@ describe('StatusBar', () => {
     expect(document.querySelector('.pill')).toBeNull();
     expect(root().querySelector('.pill')).not.toBeNull();
   });
+
+  it('counts all the calls and results given, not only the history it keeps', () => {
+    const bar = new StatusBar(document);
+    bar.show('demo', '', 'idle');
+    bar.setHistory(HISTORY, { up: 180, down: 179 });
+    expect(root().querySelector('.io')!.textContent).toBe('↑180↓179');
+  });
+
+  it('marks a terminal following the chat, in amber when it takes the approvals', () => {
+    const bar = new StatusBar(document);
+    bar.show('demo', '', 'idle');
+    const term = (): HTMLElement => root().querySelector('.term') as HTMLElement;
+    expect(term().hidden).toBe(true);
+    bar.setTerminals({ count: 1, approvals: 'browser' });
+    expect([term().hidden, term().classList.contains('approving'), term().textContent]).toEqual([false, false, '>_']);
+    expect(term().title).toBe('a bushwhack terminal follows this chat — approvals are asked here, in the browser');
+    bar.setTerminals({ count: 1, approvals: 'here' });
+    expect([term().hidden, term().classList.contains('approving')]).toEqual([false, true]);
+    expect(term().title).toBe('a bushwhack terminal follows this chat — approvals are asked there (--approve-here)');
+    // `bushwhack approvals` elsewhere takes them: amber, with no terminal on this chat.
+    bar.setTerminals({ count: 0, approvals: 'terminal' });
+    expect([term().hidden, term().classList.contains('approving')]).toEqual([false, true]);
+    bar.setTerminals({ count: 0, approvals: 'browser' });
+    expect(term().hidden).toBe(true);
+    bar.setTerminals(undefined);
+    expect(term().hidden).toBe(true);
+  });
+
+  it('takes the place of a bar another copy of the script left behind', () => {
+    const old = new StatusBar(document);
+    old.show('demo', 'running 1 call…', 'busy');
+    const fresh = new StatusBar(document);
+    fresh.show('demo', '', 'idle');
+    const bars = document.querySelectorAll('[data-bushwhack-status]');
+    expect(bars).toHaveLength(1);
+    expect(bars[0].shadowRoot!.querySelector('.text')!.textContent).toBe('bushwhack · demo');
+  });
 });

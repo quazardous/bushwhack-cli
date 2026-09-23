@@ -13,7 +13,7 @@ import type { DriverSpec } from './spec.js';
 
 export type FoundCall =
   | { kind: 'call'; call: Call; text: string }
-  | { kind: 'invalid'; id: string | null; error: string; text: string };
+  | { kind: 'invalid'; id: string | null; error: string; text: string; refused?: true };
 
 /**
  * `finished`: the chat says this turn is written. A call without its end line is then no
@@ -64,6 +64,58 @@ export function callsInTurn(turn: Element, spec: DriverSpec): FoundCall[] {
 export function callsInMarkdown(markdown: string): FoundCall[] {
   // The markdown of a turn the chat has finished: its copy button gives no other.
   return extractFencedBlocks(markdown).flatMap((block) => found(block, true) ?? []);
+}
+
+/**
+ * A copy's calls checked against the same blocks as rendered. A chat's copy can drop what
+ * the model wrote — meta.ai's removes `[t1]`-like tokens it takes for citation marks, even
+ * in code — and a call run from it would write something else than the model sent, the
+ * operator approving a diff already wrong. Where the rendered block of a call (same id)
+ * holds characters its copy lacks, the call is not run: the model hears what was lost.
+ * The other way round — the render lacking lines (a highlighter's loss) — the copy is right.
+ */
+export function crossCheck(fromCopy: FoundCall[], fromRender: FoundCall[]): FoundCall[] {
+  const rendered = new Map<string, string>();
+  for (const f of fromRender) if (f.kind === 'call') rendered.set(f.call.id, f.text);
+  return fromCopy.map((f) => {
+    if (f.kind !== 'call') return f;
+    const shown = rendered.get(f.call.id);
+    if (shown === undefined) return f;
+    const lost = lostBy(f.text, shown);
+    if (!lost) return f;
+    return {
+      kind: 'invalid',
+      id: f.call.id,
+      text: f.text,
+      // Its text would parse: the daemon must get the refusal, not the text.
+      refused: true,
+      error: `this call reached me altered: the chat's copy of your answer dropped ${lost} (it is on the page, not in what I get). Nothing was run. Write it another way — a space inside the brackets, like [ t1 ], gets through — with a new id.`,
+    };
+  });
+}
+
+/**
+ * What `copy` lacks of `shown`, whitespace aside, when `shown` is `copy` with more
+ * characters — e.g. "`[t1]`, `[x1]`" — or undefined when nothing was lost that way.
+ */
+function lostBy(copy: string, shown: string): string | undefined {
+  const a = copy.replace(/\s+/g, '');
+  const b = shown.replace(/\s+/g, '');
+  if (a === b || b.length <= a.length) return undefined;
+  const runs: string[] = [];
+  let i = 0;
+  let run = '';
+  for (const ch of b) {
+    if (i < a.length && a[i] === ch) {
+      if (run) runs.push(run);
+      run = '';
+      i++;
+    } else run += ch;
+  }
+  if (run) runs.push(run);
+  // Not a subsequence: the two differ otherwise, and neither is plainly right.
+  if (i < a.length) return undefined;
+  return [...new Set(runs)].slice(0, 5).map((r) => `\`${r}\``).join(', ');
 }
 
 /**

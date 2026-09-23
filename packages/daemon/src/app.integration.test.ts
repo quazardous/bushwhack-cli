@@ -60,6 +60,13 @@ describe.skipIf(!dockerAvailable() || !existsSync(OCTOPOD))('the app, for real (
   };
 
   beforeAll(async () => {
+    // A run killed before its cleanup leaves its edge holding the port: each run has octopod
+    // state of its own, so it would not know that edge — and could not start its own.
+    try {
+      execFileSync('docker', ['rm', '-f', 'bwtest-edge'], { stdio: 'ignore' });
+    } catch {
+      // none left
+    }
     base = await mkdtemp(join(tmpdir(), 'bw-app-it-'));
     folder = join(base, 'bwit-demo');
     await mkdir(join(folder, '.git'), { recursive: true });

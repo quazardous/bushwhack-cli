@@ -9,3 +9,4 @@ export { allowed, originOf, urlFor } from './origin.js';
 export { snapshotPage, queryPage, clickPage, fillPage, waitPage } from './dom.js';
 export type { PageResult, QueriedElement } from './dom.js';
 export * from './tools.js';
+export { PAGE_ACTIONS } from './types.js';

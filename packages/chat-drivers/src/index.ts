@@ -13,7 +13,7 @@ import { parseDriverSpec, type DriverSpec } from './spec.js';
 export { DriverSpecSchema, parseDriverSpec, selectDriver, conversationId, chatPrompt, DriverSpecError } from './spec.js';
 export type { DriverSpec } from './spec.js';
 
-export { findCalls, finishedTurns, mayHoldCalls, callsInTurn, callsInMarkdown, blockText, readComposer, writeToComposer, attachImages, send } from './engine.js';
+export { crossCheck, findCalls, finishedTurns, mayHoldCalls, callsInTurn, callsInMarkdown, blockText, readComposer, writeToComposer, attachImages, send } from './engine.js';
 export type { FoundCall } from './engine.js';
 
 /** The drivers shipped with the extension, validated like any other. */

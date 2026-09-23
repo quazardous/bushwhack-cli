@@ -3,8 +3,8 @@
 A web-chat model (Meta AI, and any other chat UI) gets a workshop on the operator's
 machine: **the project folder** to read and write — and, next, **one web app** built from
 it behind Traefik, and **the app's page** in the browser to look at and click. The
-operator approves in the terminal; the model reads back files, logs, URLs and what the
-page shows.
+operator approves each change, in the browser or in a terminal; the model reads back files,
+logs, URLs and what the page shows.
 
 Bushwhack is a **factory, not a deployment tool**. The model works on the files in front
 of it, runs them, looks at the result, and goes round again. It never writes YAML, never
@@ -293,10 +293,45 @@ them — in the app's own files — and the operator declares those files in
 
 ## Approval
 
-Write, edit, move and delete stop at the `serve` terminal: the call, its path, and for a
-write a unified diff against the current file (or the new file's content). `y`, `n`, or
-`a` — approve that tool for the rest of the session. One question at a time, in call
-order. Without a terminal to ask on, the answer is no.
+Write, edit, move, delete, app commands and secret changes stop for the operator: the call,
+its path, and for a write a unified diff against the current file (or the new file's
+content). Yes or no, and, when the operator asks, what to remember it for (below). One
+question at a time, in call order. Where the service asks, first found first:
+
+1. a terminal taking approvals that follows the project's chat (`bushwhack --approve-here`,
+   `--yolo`) — so a terminal of another project never answers for this one;
+2. the `bushwhack approvals` terminal that took them last;
+3. the browser holding the project's chat, else any paired browser.
+
+With nobody to ask, or no answer within 10 minutes, the answer is no. `bushwhack serve`
+keeps the older way: its own terminal, nothing else.
+
+**A terminal** proves it is the operator's with the operator key (`service.json`, 0600),
+which the pairing code does not give: a client holding only the code cannot approve.
+
+**The browser** has no operator key. Its answer counts only from the extension node the
+service asked, for the request it asked, and only the worker sends it: from a click on the
+call's notification (Yes, No), or on `approve.html` — the whole diff, and what to remember
+the answer for — which
+that click opens in a window of its own. The chat page's content script cannot answer, and
+neither can the panel: it sits framed over the chat page, which could lure a click;
+`approve.html` is not web-accessible, so no site can frame it. The panel and the badge only
+list what waits. A **secret value** is never asked in the browser: the call waits for a
+terminal, and the browser says so.
+
+**Remembered answers** are rules in the project's `.bushwhack/approval-rules.json`
+(`approval-rules.ts`): a kind of tool — `change` for `fs:write` and `fs:edit`, `fs:delete`,
+`fs:move`, or a tool without a path — a pattern of paths for the first three (`*` within a
+folder, `**` across; no `..`, no other wildcard), and yes or no. The service offers the
+scopes from the call's path (this file, its kind in its folder, its kind anywhere, every
+file) and keeps only a pattern that covers the call. It reads the file at each question, so
+a hand edit counts at once; a file that is not valid counts for nothing — every call is
+asked — and is never written over. The most precise rule wins, no on a tie. A secret is
+never remembered. The file lives where the model cannot reach: `.bushwhack/` does not exist
+for its tools.
+
+Every decision goes to the project's `.bushwhack/approvals.jsonl`, with who made it
+(`operator`, `browser`, `rule` and which, `yolo`, `nobody`).
 
 The prompt is a speed bump, not the boundary: the boundary is the typed specs, the
 workspace jail and the binding.
@@ -309,7 +344,7 @@ memory alone.
 | Where | What | Why there |
 |---|---|---|
 | `storage.local` | pairings (per session), services paired once for all their projects, bindings (conversation → session), which project's manifest each conversation was given, settings, the extension's node id, the last log lines; in the chat pages' content scripts, each conversation's handled calls and history | survives the worker, the browser and a reload of the extension |
-| `storage.session` | the app tab of each session (page:*), the tab groups | tab and group ids restart with the browser: kept for its session only |
+| `storage.session` | the app tab of each session (page:*), the tab groups, the calls waiting for a yes in this browser | tab and group ids restart with the browser: kept for its session only |
 | memory | the relay connections, when a project's chat was last announced to its service | rebuilt on demand: a chat page asks for its status every second, which reconnects its project and announces it |
 
 Messages between the layers:
@@ -357,12 +392,12 @@ Messages between the layers:
 | `packages/protocol` | the call grammar, result blocks, tool specs and argument typing, the manifest, fenced-block extraction from markdown, the bridge constants |
 | `packages/workspace` | the project folder as the model sees it: the realpath jail, the ignore rules, the `fs:*` tools; applies the secret rules to every path |
 | `packages/secrets` | declared secret files: declarations, formats (dotenv), scrambling, masking — no dependency on the rest of bushwhack |
-| `packages/daemon` | `bushwhack serve` and its CLI clients: dispatcher, replay store, terminal approval and hidden input, session state, the `secret:*` tools |
+| `packages/daemon` | the service, `bushwhack serve` and the CLI: dispatcher, replay store, where approvals are asked (a terminal, else the browser) and the terminal's own, hidden input, session state, the `secret:*` tools |
 | `packages/chat-drivers` | per-chat DOM knowledge, as data, and the one engine that uses it |
 | `packages/hub` | `HubNode` and its transports: envelope routing, dedup, request/reply |
 | `packages/relay` | `RelayServer` as a class the daemon embeds: pairing, per-client isolation, `/health` |
 | `packages/page` | the `page:*` tools: specs, the origin rules, the DOM readers and actions injected into the tab, and the controller that checks the origin around each action — the browser behind an interface |
-| `extension/` | the MV3 extension: service worker, content script, clipboard hook, panel, build and dev tooling |
+| `extension/` | the MV3 extension: service worker, content script, clipboard hook, panel, approval notifications and page, build and dev tooling |
 
 ## Designed, not built
 

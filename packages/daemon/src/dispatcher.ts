@@ -31,10 +31,15 @@ export interface ToolHost {
 }
 
 export type Verdict = 'yes' | 'no';
+/** A no that says why — told to the model (a rule the operator set, say). */
+export interface Refusal {
+  verdict: 'no';
+  reason: string;
+}
 
 export interface Approver {
   /** Called only for tools whose spec says `approval: true`. */
-  ask(call: ToolRun & { id: string; conversation: string }): Promise<Verdict>;
+  ask(call: ToolRun & { id: string; conversation: string }): Promise<Verdict | Refusal>;
   /** A secret's value, typed by the operator — undefined when they refuse. Never shown anywhere. */
   secretValue(request: { id: string; file: string; name: string; description?: string }): Promise<string | undefined>;
   /** A line for the operator, now — nothing to answer (a report:bug). */
@@ -95,12 +100,13 @@ export class Dispatcher {
     }
 
     const run: ToolRun = { tool: call.tool, args: bound.args, body: bound.body };
-    if (spec.approval && (await this.approver.ask({ ...run, id: call.id, conversation })) === 'no') {
+    const answer = spec.approval ? await this.approver.ask({ ...run, id: call.id, conversation }) : 'yes';
+    if (answer !== 'yes') {
       return this.settle(conversation, call.id, hash, {
         tool: call.tool,
         id: call.id,
         status: 'denied',
-        content: 'the operator refused this call',
+        content: typeof answer === 'object' ? `the operator refused this call: ${answer.reason}` : 'the operator refused this call',
       });
     }
 
@@ -135,6 +141,11 @@ export class Dispatcher {
     const tool = scanned?.kind === 'call' ? scanned.call.tool : 'unknown';
     this.onEvent(`- ${id ?? '?'} ${tool} skipped`);
     return { result: { tool, id, status: 'skipped', content: `not run: ${refused} was denied just before it, and this call may have depended on it — send it again in a new answer if it still makes sense` }, replay: false };
+  }
+
+  /** A call the page refused to pass on: its error, nothing run. */
+  refuse(id: string | null, error: string): Dispatched {
+    return this.fail(typeof id === 'string' ? id.slice(0, 40) : null, 'unknown', error.slice(0, 1000));
   }
 
   private fail(id: string | null, tool: string, error: string): Dispatched {

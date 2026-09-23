@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1074 718" width="1074" height="718" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'DejaVu Sans Mono',monospace" font-size="14">
+<rect width="1074" height="718" rx="10" fill="#1e1e2e"/>
+<circle cx="18" cy="15" r="6" fill="#f38ba8"/><circle cx="38" cy="15" r="6" fill="#f9e2af"/><circle cx="58" cy="15" r="6" fill="#a6e3a1"/>
+<text x="537" y="20" fill="#6c7086" text-anchor="middle" font-size="12">bushwhack — semis-meta, live in Meta AI</text>
+<rect x="66.4" y="45.0" width="42.5" height="18.7" fill="#7a4a24"/>
+<rect x="150.4" y="45.0" width="8.9" height="18.7" fill="#9aa4ae"/>
+<rect x="158.8" y="45.0" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="58.0" y="54.1" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="66.4" y="45.0" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="74.8" y="45.0" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="83.2" y="45.0" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="91.6" y="45.0" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="100.0" y="45.0" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="108.4" y="54.1" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="142.0" y="54.1" width="8.9" height="9.6" fill="#e8edf2"/>
+<rect x="150.4" y="45.0" width="8.9" height="9.6" fill="#e8edf2"/>
+<rect x="158.8" y="45.0" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="58.0" y="63.2" width="59.3" height="18.7" fill="#7a4a24"/>
+<rect x="133.6" y="63.2" width="8.9" height="18.7" fill="#e8edf2"/>
+<rect x="142.0" y="63.2" width="8.9" height="18.7" fill="#9aa4ae"/>
+<rect x="150.4" y="63.2" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="41.2" y="72.3" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="49.6" y="72.3" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="58.0" y="63.2" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="66.4" y="63.2" width="8.9" height="9.6" fill="#3a2210"/>
+<rect x="74.8" y="63.2" width="8.9" height="9.6" fill="#3a2210"/>
+<rect x="83.2" y="63.2" width="8.9" height="9.6" fill="#3a2210"/>
+<rect x="91.6" y="63.2" width="8.9" height="9.6" fill="#3a2210"/>
+<rect x="100.0" y="63.2" width="8.9" height="9.6" fill="#3a2210"/>
+<rect x="108.4" y="63.2" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="116.8" y="72.3" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="125.2" y="72.3" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="133.6" y="63.2" width="8.9" height="9.6" fill="#e8edf2"/>
+<rect x="142.0" y="63.2" width="8.9" height="9.6" fill="#9aa4ae"/>
+<rect x="150.4" y="63.2" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="41.2" y="81.4" width="17.3" height="18.7" fill="#20140b"/>
+<rect x="58.0" y="81.4" width="50.9" height="18.7" fill="#f0c08a"/>
+<rect x="108.4" y="81.4" width="17.3" height="18.7" fill="#20140b"/>
+<rect x="133.6" y="81.4" width="8.9" height="18.7" fill="#4a2c14"/>
+<rect x="142.0" y="81.4" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="32.8" y="81.4" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="41.2" y="81.4" width="8.9" height="9.6" fill="#7a4a24"/>
+<rect x="49.6" y="81.4" width="8.9" height="9.6" fill="#7a4a24"/>
+<rect x="58.0" y="81.4" width="8.9" height="9.6" fill="#7a4a24"/>
+<rect x="66.4" y="81.4" width="8.9" height="9.6" fill="#7a4a24"/>
+<rect x="74.8" y="81.4" width="8.9" height="9.6" fill="#7a4a24"/>
+<rect x="83.2" y="81.4" width="8.9" height="9.6" fill="#7a4a24"/>
+<rect x="91.6" y="81.4" width="8.9" height="9.6" fill="#7a4a24"/>
+<rect x="100.0" y="81.4" width="8.9" height="9.6" fill="#7a4a24"/>
+<rect x="108.4" y="81.4" width="8.9" height="9.6" fill="#7a4a24"/>
+<rect x="116.8" y="81.4" width="8.9" height="9.6" fill="#7a4a24"/>
+<rect x="125.2" y="81.4" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="133.6" y="81.4" width="8.9" height="9.6" fill="#4a2c14"/>
+<rect x="142.0" y="81.4" width="8.9" height="9.6" fill="#20140b"/>
+<text y="96.4" xml:space="preserve"><tspan x="192.4" fill="#cdd6f4" font-weight="bold">bushwhack</tspan><tspan x="276.4" fill="#cdd6f4" opacity="0.6">v0.1.0</tspan></text>
+<rect x="49.6" y="99.6" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="58.0" y="99.6" width="50.9" height="18.7" fill="#f0c08a"/>
+<rect x="108.4" y="99.6" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="125.2" y="99.6" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="133.6" y="99.6" width="8.9" height="18.7" fill="#f0c08a"/>
+<rect x="142.0" y="99.6" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="49.6" y="99.6" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="58.0" y="99.6" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="66.4" y="99.6" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="74.8" y="99.6" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="83.2" y="99.6" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="91.6" y="99.6" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="100.0" y="99.6" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="108.4" y="99.6" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="125.2" y="99.6" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="133.6" y="99.6" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="142.0" y="99.6" width="8.9" height="9.6" fill="#20140b"/>
+<text y="114.6" xml:space="preserve"><tspan x="192.4" fill="#cdd6f4" opacity="0.6">web chats on your folders — every change your yes</tspan></text>
+<rect x="58.0" y="117.8" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="66.4" y="117.8" width="8.9" height="18.7" fill="#b07a4e"/>
+<rect x="74.8" y="117.8" width="8.9" height="18.7" fill="#f0c08a"/>
+<rect x="83.2" y="117.8" width="8.9" height="18.7" fill="#b07a4e"/>
+<rect x="91.6" y="117.8" width="8.9" height="18.7" fill="#f0c08a"/>
+<rect x="100.0" y="117.8" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="125.2" y="117.8" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="133.6" y="117.8" width="8.9" height="18.7" fill="#c9a55c"/>
+<rect x="142.0" y="117.8" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="49.6" y="117.8" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="58.0" y="117.8" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="66.4" y="117.8" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="74.8" y="117.8" width="8.9" height="9.6" fill="#b07a4e"/>
+<rect x="83.2" y="117.8" width="8.9" height="9.6" fill="#b07a4e"/>
+<rect x="91.6" y="117.8" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="100.0" y="117.8" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="108.4" y="117.8" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="125.2" y="117.8" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="133.6" y="117.8" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="142.0" y="117.8" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="49.6" y="136.0" width="92.9" height="18.7" fill="#c9a55c"/>
+<rect x="142.0" y="136.0" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="41.2" y="145.1" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="49.6" y="136.0" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="58.0" y="136.0" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="66.4" y="136.0" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="74.8" y="136.0" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="83.2" y="136.0" width="8.9" height="9.6" fill="#f0c08a"/>
+<rect x="91.6" y="136.0" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="100.0" y="136.0" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="108.4" y="136.0" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="116.8" y="136.0" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="125.2" y="136.0" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="133.6" y="136.0" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="142.0" y="136.0" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="32.8" y="154.2" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="41.2" y="154.2" width="17.3" height="18.7" fill="#c9a55c"/>
+<rect x="58.0" y="154.2" width="8.9" height="18.7" fill="#9a7a38"/>
+<rect x="66.4" y="154.2" width="8.9" height="18.7" fill="#c9a55c"/>
+<rect x="74.8" y="154.2" width="17.3" height="18.7" fill="#5a3a1c"/>
+<rect x="91.6" y="154.2" width="34.1" height="18.7" fill="#c9a55c"/>
+<rect x="125.2" y="154.2" width="8.9" height="18.7" fill="#9a7a38"/>
+<rect x="133.6" y="154.2" width="17.3" height="18.7" fill="#c9a55c"/>
+<rect x="150.4" y="154.2" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="32.8" y="154.2" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="41.2" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="49.6" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="58.0" y="154.2" width="8.9" height="9.6" fill="#9a7a38"/>
+<rect x="66.4" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="74.8" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="83.2" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="91.6" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="100.0" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="108.4" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="116.8" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="125.2" y="154.2" width="8.9" height="9.6" fill="#9a7a38"/>
+<rect x="133.6" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="142.0" y="154.2" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="150.4" y="154.2" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="32.8" y="172.4" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="41.2" y="172.4" width="17.3" height="18.7" fill="#c9a55c"/>
+<rect x="58.0" y="172.4" width="8.9" height="18.7" fill="#9a7a38"/>
+<rect x="66.4" y="172.4" width="42.5" height="18.7" fill="#c9a55c"/>
+<rect x="108.4" y="172.4" width="17.3" height="18.7" fill="#5a3a1c"/>
+<rect x="125.2" y="172.4" width="8.9" height="18.7" fill="#9a7a38"/>
+<rect x="133.6" y="172.4" width="17.3" height="18.7" fill="#c9a55c"/>
+<rect x="150.4" y="172.4" width="8.9" height="18.7" fill="#20140b"/>
+<rect x="32.8" y="172.4" width="8.9" height="9.6" fill="#20140b"/>
+<rect x="41.2" y="172.4" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="49.6" y="172.4" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="58.0" y="172.4" width="8.9" height="9.6" fill="#9a7a38"/>
+<rect x="66.4" y="172.4" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="74.8" y="172.4" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="83.2" y="172.4" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="91.6" y="172.4" width="8.9" height="9.6" fill="#5a3a1c"/>
+<rect x="100.0" y="172.4" width="8.9" height="9.6" fill="#5a3a1c"/>
+<rect x="108.4" y="172.4" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="116.8" y="172.4" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="125.2" y="172.4" width="8.9" height="9.6" fill="#9a7a38"/>
+<rect x="133.6" y="172.4" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="142.0" y="172.4" width="8.9" height="9.6" fill="#c9a55c"/>
+<rect x="150.4" y="172.4" width="8.9" height="9.6" fill="#20140b"/>
+<text y="223.8" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">  instance  </tspan><tspan x="116.8" fill="#cdd6f4" font-weight="bold">default</tspan><tspan x="175.6" fill="#cdd6f4" opacity="0.6"> :47300</tspan></text>
+<text y="242.0" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">  browser   Chromium 153</tspan><tspan x="217.6" fill="#cdd6f4" opacity="0.6"> (dev extension)</tspan><tspan x="360.4" fill="#94e2d5">← semis-meta's chat is open here: prompts go here</tspan></text>
+<text y="260.2" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">  chat      </tspan><tspan x="116.8" fill="#cdd6f4" font-weight="bold">Meta AI</tspan><tspan x="184.0" fill="#cdd6f4" opacity="0.6">— www.meta.ai/0000-…</tspan></text>
+<text y="296.6" xml:space="preserve"><tspan x="16.0" fill="#94e2d5" opacity="0.6">❯</tspan><tspan x="24.4" fill="#cdd6f4" opacity="0.6"> Add standalone/README.md with three short lines: what the page does, and that its data stays in the browser. Use fs:write.</tspan></text>
+<text y="314.8" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4" opacity="0.6">  ⎿  sent to www.meta.ai/0000-…</tspan></text>
+<text y="333.0" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4" opacity="0.6">  ⠇ the model is answering… · 6s</tspan></text>
+<text y="351.2" xml:space="preserve"><tspan x="16.0" fill="#94e2d5">●</tspan><tspan x="32.8" fill="#cdd6f4" font-weight="bold">fs:write</tspan><tspan x="100.0" fill="#cdd6f4">(standalone/README.md)</tspan></text>
+<text y="369.4" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4" opacity="0.6">  ⠇ running 1 call… · 0s</tspan></text>
+<text y="405.8" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">┌ semis-meta · c360 fs:write</tspan></text>
+<text y="424.0" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">│ new file standalone/README.md</tspan></text>
+<text y="442.2" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">│ Standalone semis — page autonome pour saisir et suivre semis / repiquages / récoltes.</tspan></text>
+<text y="460.4" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">│ Fonctionne hors ligne, sans backend.</tspan></text>
+<text y="478.6" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">│ Toutes les données restent dans le navigateur (localStorage / IndexedDB).</tspan></text>
+<text y="496.8" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">└ approve? [y]es / [n]o / [a]lways fs:write for semis-meta: y</tspan></text>
+<text y="515.0" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4" opacity="0.6">  ⎿  c360 ok</tspan></text>
+<text y="533.2" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4" opacity="0.6">  ⠧ results sent — the model goes on… · 18s</tspan></text>
+<text y="551.4" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">README créé :</tspan></text>
+<text y="587.8" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">standalone/README.md (201 bytes) :</tspan></text>
+<text y="624.2" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">Standalone semis — page autonome pour saisir et suivre semis / repiquages / récoltes.</tspan></text>
+<text y="642.4" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">Fonctionne hors ligne, sans backend.</tspan></text>
+<text y="660.6" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">Toutes les données restent dans le navigateur (localStorage / IndexedDB).</tspan></text>
+<text y="697.0" xml:space="preserve"><tspan x="16.0" fill="#cdd6f4">Tu veux que je retente le fix db.transplants=[t1]; maintenant que les writes passent ?</tspan></text>
+</svg>

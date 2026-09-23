@@ -13,6 +13,7 @@ import { constants } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { dirname, isAbsolute, join, posix, relative, sep } from 'node:path';
 import { IGNORE_FILES, IgnoreRules, isRuleFile } from './rules.js';
+import { windowsNameProblem } from './win-paths.js';
 import { SecretFiles, type SecretFormat } from '@bushwhack/secrets';
 
 export class WorkspaceError extends Error {
@@ -58,15 +59,19 @@ export class Workspace {
   private readonly rules: IgnoreRules;
   readonly secrets: SecretFiles;
 
-  private constructor(readonly root: string) {
+  private constructor(
+    readonly root: string,
+    /** Windows' naming rules apply (NTFS): some names are other names, or devices. */
+    private readonly windows: boolean,
+  ) {
     this.rules = new IgnoreRules(root);
     this.secrets = new SecretFiles(root);
   }
 
-  static async open(folder: string): Promise<Workspace> {
+  static async open(folder: string, options: { platform?: NodeJS.Platform } = {}): Promise<Workspace> {
     const root = await realpath(folder);
     if (!(await stat(root)).isDirectory()) throw new WorkspaceError(`${folder} is not a directory`);
-    return new Workspace(root);
+    return new Workspace(root, (options.platform ?? process.platform) === 'win32');
   }
 
   private inside(abs: string): boolean {
@@ -79,6 +84,12 @@ export class Workspace {
     }
     const rel = posix.normalize(path).replace(/\/+$/, '');
     if (rel === '..' || rel.startsWith('../')) throw new WorkspaceError(`"${path}" leaves the project`);
+    if (this.windows) {
+      for (const segment of rel.split('/')) {
+        const problem = windowsNameProblem(segment);
+        if (problem) throw new WorkspaceError(`"${path}": "${segment}" is not a name this project can hold on Windows (${problem})`);
+      }
+    }
     return rel === '.' ? '' : rel;
   }
 

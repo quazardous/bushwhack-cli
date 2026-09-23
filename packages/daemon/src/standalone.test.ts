@@ -27,17 +27,17 @@ afterEach(async () => {
 });
 
 describe('the mode', () => {
-  it('is octopod unless setup chose standalone, and keeps the rest of the config', async () => {
-    expect(await readMode(env)).toBe('octopod');
+  it('is standalone unless setup chose octopod, and keeps the rest of the config', async () => {
+    expect(await readMode(env)).toBe('standalone');
     await mkdir(join(base, 'config', 'bushwhack'), { recursive: true });
     await writeFile(configFile(env), '{"other":1,"mode":"weird"}');
-    expect(await readMode(env)).toBe('octopod');
-    await writeMode('standalone', env);
     expect(await readMode(env)).toBe('standalone');
     await writeMode('octopod', env);
     expect(await readMode(env)).toBe('octopod');
+    await writeMode('standalone', env);
+    expect(await readMode(env)).toBe('standalone');
     await writeFile(configFile(env), 'not json');
-    expect(await readMode(env)).toBe('octopod');
+    expect(await readMode(env)).toBe('standalone');
   });
 });
 

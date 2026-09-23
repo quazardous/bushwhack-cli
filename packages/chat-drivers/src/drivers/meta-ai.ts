@@ -62,6 +62,7 @@ export const META_AI = {
       'After your calls, end your answer. Do not predict what a result will say, and never write a `bushwhack-result` block: the real one comes in my next message.',
       'Very long answers get cut off. To change a long file, prefer several `fs:edit` calls to one `fs:write`; keep one answer under about 200 lines of code.',
       'Before `fs:edit`, `fs:read` the lines you change: SEARCH must match the file exactly, spaces and indentation included.',
+      'meta.ai drops a letter and digits in brackets — `[t1]`, `[x2]` — from what I get of your answer, even in code. Write them with a space inside: `[ t1 ]`.',
       'Talk to me in the language I write in. Tool names, keys and the call shape stay exactly as specified.',
     ],
   },

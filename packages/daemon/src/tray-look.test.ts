@@ -20,7 +20,7 @@ function pwsh(script: string): unknown {
 }
 
 const list = JSON.stringify({
-  mode: 'standalone',
+  mode: 'octopod',
   code: 'ABCD-EFGH',
   browsers: [{ browser: 'Google Chrome 153', chats: ['shop'] }],
   projects: [
@@ -36,7 +36,7 @@ describe('the Windows tray', () => {
   });
 
   it.skipIf(!hasPwsh)('says how many projects, how many chats live, and the mode', { timeout: 20_000 }, () => {
-    expect(pwsh(`Get-TrayLook ('${list}' | ConvertFrom-Json)`)).toEqual({ up: true, line: '2 projects - 1 chat live (standalone)', tooltip: 'bushwhack - 2 projects, 1 chat live' });
+    expect(pwsh(`Get-TrayLook ('${list}' | ConvertFrom-Json)`)).toEqual({ up: true, line: '2 projects - 1 chat live (octopod)', tooltip: 'bushwhack - 2 projects, 1 chat live' });
     expect(pwsh(`Get-TrayLook $null`)).toMatchObject({ up: false, tooltip: 'bushwhack - service stopped' });
     expect(pwsh(`(Get-TrayLook ('{"projects":[],"browsers":[]}' | ConvertFrom-Json)).line`)).toBe('0 projects - no chat open, no browser paired');
   });

@@ -36,6 +36,16 @@ export function snapshotPage(maxChars: number): PageResult<string> {
     return style.display !== 'none' && style.visibility !== 'hidden' && !(el as HTMLElement).hidden;
   };
   const text = (el: Element): string => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  // A run's text, a line break read as a space: textContent glues "x12<br>2026" together.
+  const runText = (el: Element): string => {
+    let out = '';
+    const nodes = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    for (let n = nodes.nextNode(); n; n = nodes.nextNode()) {
+      if (n.nodeType === Node.TEXT_NODE) out += n.nodeValue ?? '';
+      else if ((n as Element).tagName === 'BR') out += ' ';
+    }
+    return out.replace(/\s+/g, ' ').trim().slice(0, 200);
+  };
 
   const lines: string[] = [`title: ${document.title}`, `url: ${location.href}`];
   // A hidden element hides everything under it: reject the whole subtree, not just the node.
@@ -43,6 +53,13 @@ export function snapshotPage(maxChars: number): PageResult<string> {
     acceptNode: (n) => (visible(n as Element) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
   });
   let seenText = 0;
+  // Elements that hold only text and inline markup; and those whose text is already out.
+  const INLINE = /^(a|abbr|b|bdi|bdo|br|cite|code|data|dfn|em|i|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)$/;
+  const texts = new Set<Element>();
+  const insideText = (el: Element): boolean => {
+    for (let up = el.parentElement; up; up = up.parentElement) if (texts.has(up)) return true;
+    return false;
+  };
   for (let node = walker.nextNode() as Element | null; node; node = walker.nextNode() as Element | null) {
     const tag = node.tagName.toLowerCase();
     if (/^h[1-6]$/.test(tag)) lines.push(`${'#'.repeat(Number(tag[1]))} ${text(node)}`);
@@ -54,13 +71,16 @@ export function snapshotPage(maxChars: number): PageResult<string> {
       const value = field.type === 'password' ? '••••' : String(field.value ?? '').slice(0, 80);
       lines.push(`[${tag}${field.type && tag === 'input' ? `:${field.type}` : ''}] "${label}" = "${value}"  (${selectorOf(node)})`);
     } else if (tag === 'img') lines.push(`[image] "${node.getAttribute('alt') ?? ''}"  (${selectorOf(node)})`);
-    else if (/^(p|li|td|th|pre|blockquote|label|span|div)$/.test(tag)) {
-      // Leaf-ish text only: the text of an element with no element children.
-      if (node.children.length === 0) {
-        const t = text(node);
+    else if (/^(p|li|td|th|pre|blockquote|label|span|div|dt|dd|figcaption|caption|summary|legend|b|strong|em|i|code|small|mark)$/.test(tag)) {
+      // A run of text: an element whose children are all inline — "<b>Tomate</b> — x12",
+      // "Hello <em>big</em> world" — gives its whole text on one line, and none of the
+      // elements under it gives it again. (Only leaves were read: the <b> was lost.)
+      if ([...node.children].every((c) => INLINE.test(c.tagName.toLowerCase())) && !insideText(node)) {
+        const t = runText(node);
         if (t && seenText < 400) {
           lines.push(t);
           seenText++;
+          texts.add(node);
         }
       }
     }
@@ -148,5 +168,80 @@ export async function waitPage(selector: string | null, timeoutMs: number): Prom
     }
     if (Date.now() - start >= timeoutMs) return { ok: false, error: `still waiting after ${timeoutMs} ms` };
     await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
+/**
+ * What the page keeps for itself: its localStorage and sessionStorage keys, its IndexedDB
+ * databases — the data of an app with no server. With `key`, that key's value; with `db`
+ * and `store`, a store's first entries. Read only, bounded to `maxChars`.
+ */
+export async function storagePage(key: string, db: string, store: string, maxChars: number): Promise<PageResult<string>> {
+  const cut = (s: string): string => (s.length > maxChars ? `${s.slice(0, maxChars)}\n… (cut at ${maxChars} characters)` : s);
+  const areas: [string, Storage][] = [
+    ['localStorage', window.localStorage],
+    ['sessionStorage', window.sessionStorage],
+  ];
+  const request = <T>(r: IDBRequest<T>): Promise<T> =>
+    new Promise((resolve, reject) => {
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    });
+  // An existing database only: opening one that is not there would create it.
+  const openDb = (name: string): Promise<IDBDatabase | undefined> =>
+    new Promise((resolve, reject) => {
+      const r = indexedDB.open(name);
+      r.onupgradeneeded = () => {
+        r.transaction?.abort();
+        resolve(undefined);
+      };
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => (r.error?.name === 'AbortError' ? resolve(undefined) : reject(r.error));
+    });
+
+  try {
+    if (key) {
+      for (const [name, area] of areas) {
+        const value = area.getItem(key);
+        if (value !== null) return { ok: true, data: cut(`${name} "${key}" (${value.length} characters):\n${value}`) };
+      }
+      return { ok: false, error: `no key "${key}" in localStorage or sessionStorage — page:storage alone lists them` };
+    }
+    if (db) {
+      if (typeof indexedDB === 'undefined') return { ok: false, error: 'this page has no IndexedDB' };
+      const base = await openDb(db);
+      if (!base) return { ok: false, error: `no IndexedDB database "${db}" — page:storage alone lists them` };
+      try {
+        if (!store) return { ok: true, data: `IndexedDB "${db}": ${[...base.objectStoreNames].join(', ') || 'no store'}` };
+        if (!base.objectStoreNames.contains(store)) return { ok: false, error: `no store "${store}" in "${db}"; its stores: ${[...base.objectStoreNames].join(', ') || 'none'}` };
+        const objects = base.transaction(store, 'readonly').objectStore(store);
+        const [count, first] = await Promise.all([request(objects.count()), request(objects.getAll(null, 20))]);
+        const lines = first.map((entry) => JSON.stringify(entry));
+        return { ok: true, data: cut(`IndexedDB "${db}" / "${store}": ${count} entr${count === 1 ? 'y' : 'ies'}${count > first.length ? `, the first ${first.length}` : ''}\n${lines.join('\n')}`) };
+      } finally {
+        base.close();
+      }
+    }
+    const lines: string[] = [];
+    for (const [name, area] of areas) {
+      const keys = Array.from({ length: area.length }, (_, i) => area.key(i)).filter((k): k is string => k !== null);
+      lines.push(keys.length ? `${name}:` : `${name}: empty`);
+      for (const k of keys) lines.push(`  ${k}  (${(area.getItem(k) ?? '').length} characters)`);
+    }
+    const hasDb = typeof indexedDB !== 'undefined';
+    const listed = hasDb && typeof indexedDB.databases === 'function' ? await indexedDB.databases() : [];
+    lines.push(listed.length ? 'IndexedDB:' : 'IndexedDB: none');
+    for (const info of listed) {
+      if (!info.name) continue;
+      const base = await openDb(info.name);
+      if (!base) continue;
+      const stores = [...base.objectStoreNames];
+      const counts = await Promise.all(stores.map((s) => request(base.transaction(s, 'readonly').objectStore(s).count()).catch(() => -1)));
+      base.close();
+      lines.push(`  ${info.name}: ${stores.map((s, i) => `${s} (${counts[i] < 0 ? '?' : counts[i]})`).join(', ') || 'no store'}`);
+    }
+    return { ok: true, data: cut(lines.join('\n')) };
+  } catch (e) {
+    return { ok: false, error: `the page's storage could not be read: ${(e as Error).message}` };
   }
 }

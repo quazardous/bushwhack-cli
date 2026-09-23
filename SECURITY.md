@@ -14,7 +14,10 @@ the tools let through. The full design is in [ARCHITECTURE.md](./ARCHITECTURE.md
   ignored files, `.git/` and bushwhack's own state do not exist for them; links out of the
   folder are refused.
 - **You approve changes.** Every write, edit, move, delete, secret change and app command
-  waits for a yes in your terminal (unless you started it with `--yolo`).
+  waits for your yes — in a browser notification and its approval window, or in your
+  terminal with `--approve-here` (unless you started it with `--yolo`). Only a click in the
+  extension's own notification or window counts: not the chat page, nor the panel drawn
+  over it. Secret values are typed in a terminal only.
 - **Secrets stay names.** Declared secret files show names only; their values, and the
   credentials of the app bushwhack runs, are masked in everything the chat receives —
   a best effort: see [DISCLAIMER.md](./DISCLAIMER.md).

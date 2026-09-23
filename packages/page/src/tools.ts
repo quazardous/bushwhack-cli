@@ -53,6 +53,16 @@ export const PAGE_TOOLS: ToolSpec[] = [
       timeout: { type: 'int', description: 'seconds', min: 1, max: 30, default: 5 },
     },
   },
+  {
+    name: 'page:storage',
+    summary: 'What the page keeps in the browser — its data when it has no server: localStorage and sessionStorage keys with their size, IndexedDB databases with their stores. With key, that key\'s value; with db (and store), a store\'s first entries. Read only.',
+    approval: false,
+    params: {
+      key: { type: 'text', description: 'a localStorage or sessionStorage key: its value', maxLength: 300 },
+      db: { type: 'text', description: 'an IndexedDB database: its stores', maxLength: 200 },
+      store: { type: 'text', description: 'with db, a store: its first entries', maxLength: 200 },
+    },
+  },
   { name: 'page:console', summary: 'The page’s last console messages, errors and native dialogs (alert, confirm, prompt) since it was opened.', approval: false, params: {} },
   { name: 'page:network', summary: 'The page’s last requests (method, URL, status, time) since it was opened.', approval: false, params: {} },
   {

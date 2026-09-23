@@ -3,7 +3,7 @@
  * Everything that decides — origins, bounds, the checks around each action — is in
  * @bushwhack/page and tested there; this is only the wiring.
  */
-import type { Browser, PageRequest, RecordedEvents, TabInfo, TabStore } from '@bushwhack/page';
+import { PAGE_ACTIONS, type Browser, type PageRequest, type RecordedEvents, type TabInfo, type TabStore } from '@bushwhack/page';
 import { joinSessionGroup, sessionWindow, titleOf } from './tab-groups.js';
 
 const RECORDER_ID = 'bushwhack-page-recorder';
@@ -127,7 +127,8 @@ export const chromeBrowser: Browser = {
   },
 };
 
-const ACTIONS = new Set(['open', 'snapshot', 'query', 'click', 'fill', 'wait', 'console', 'network', 'screenshot']);
+// From the tools' own list: a new page:* tool is accepted here without a second list to forget.
+const ACTIONS = new Set<string>(PAGE_ACTIONS);
 
 /** An origin the extension will act on: the local edge's, never anything on the internet. */
 function localOrigin(origin: unknown): boolean {

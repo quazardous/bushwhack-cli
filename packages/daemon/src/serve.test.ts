@@ -116,6 +116,12 @@ describe('serve', () => {
     expect(oversized.manifest).not.toContain('Fixture Chat');
   });
 
+  it('answers a call the page refused without running it, and runs the next', async () => {
+    const reply = await bridge.call({ conversation: 'meta.ai/c1', calls: [{ id: 'x1', error: 'this call reached me altered: `[t1]` was dropped' }, read('x2', 'README.md')] }, 5000);
+    expect(reply.summary.map((r) => [r.id, r.status])).toEqual([['x1', 'error'], ['x2', 'ok']]);
+    expect(reply.text).toContain('`[t1]` was dropped');
+  });
+
   it('runs calls in order and answers with result blocks', async () => {
     const reply = await bridge.call({ conversation: 'meta.ai/c1', calls: [read('c1', 'README.md'), read('c2', '.env')] }, 5000);
     expect(reply.summary).toEqual([

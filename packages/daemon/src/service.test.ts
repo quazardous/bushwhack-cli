@@ -23,8 +23,19 @@ let beta: string;
 let service: Service;
 let clients: { close(): void }[];
 
-async function start(approvalWaitMs = 2000): Promise<void> {
-  service = await startService({ dir, ports: PORTS, octopod: noOctopod, out: () => {}, env: { XDG_STATE_HOME: join(base, 'xdg') }, approvalWaitMs });
+async function start(approvalWaitMs = 2000, presenceMs?: number): Promise<void> {
+  service = await startService({ dir, ports: PORTS, octopod: noOctopod, out: () => {}, env: { XDG_STATE_HOME: join(base, 'xdg') }, approvalWaitMs, ...(presenceMs ? { presenceMs } : {}) });
+}
+
+/** A browser on the service, as the extension registers: `answer` runs on each chat:who. */
+async function browser(nodeId: string, answer?: (ext: HubNode) => void): Promise<HubNode> {
+  const ext = new HubNode({ nodeId, defaultScope: 'global' });
+  const t = new WebSocketTransport({ name: 'relay', url: `ws://127.0.0.1:${service.port}`, peerPatterns: ['*'], reconnect: { maxAttempts: 1 }, registrationMessage: { type: 'register', nodeId, securityKey: service.code, client: 'extension' } });
+  ext.addTransport(t);
+  await t.connect();
+  clients.push({ close: () => t.disconnect() });
+  if (answer) ext.on(CHAT.who, () => answer(ext));
+  return ext;
 }
 
 async function bridgeTo(folder: string): Promise<BridgeClient> {
@@ -325,6 +336,45 @@ describe('the service', () => {
     intruder.emit(CHAT.event, { session: alphaNode, kind: 'answer', text: 'forged' }, { target: 'service:bushwhack' });
     await new Promise((r) => setTimeout(r, 150));
     expect(events).toEqual([]);
+  });
+
+  it('asks the browsers which chats they show when a terminal opens: it starts knowing, without waiting for a heartbeat', async () => {
+    const alphaNode = service.list().find((p) => p.folder === alpha)!.nodeId;
+    let asked = 0;
+    await browser('ext:asked', (ext) => {
+      asked++;
+      ext.emit(CHAT.here, { session: alphaNode, conversation: 'gemini.google.com/g1', chat: 'Gemini' }, { target: SERVICE_NODE });
+    });
+    const terminal = await operatorClient((await readServiceFile(dir))!, 'cli:opens');
+    clients.push(terminal);
+    await terminal.chatAttach(alphaNode);
+    const { projects } = (await terminal.list()) as { projects: { nodeId: string; chat?: { chat?: string; conversation?: string } }[] };
+    expect(projects.find((p) => p.nodeId === alphaNode)!.chat).toMatchObject({ chat: 'Gemini', conversation: 'gemini.google.com/g1' });
+    // Known now: the next terminal does not ask again.
+    const second = await operatorClient((await readServiceFile(dir))!, 'cli:second');
+    clients.push(second);
+    await second.chatAttach(alphaNode);
+    expect(asked).toBe(1);
+  });
+
+  it('tells its terminals of a chat back after going silent — those opened meanwhile heard there was none', async () => {
+    await service.close();
+    await start(2000, 300);
+    const alphaNode = service.list().find((p) => p.folder === alpha)!.nodeId;
+    const ext = await browser('ext:silent');
+    const here = (): void => void ext.emit(CHAT.here, { session: alphaNode, conversation: 'gemini.google.com/g1', chat: 'Gemini' }, { target: SERVICE_NODE });
+    here();
+    await new Promise((r) => setTimeout(r, 100));
+    // Silent longer than the presence lasts: gone, without a word.
+    await new Promise((r) => setTimeout(r, 400));
+    const terminal = await operatorClient((await readServiceFile(dir))!, 'cli:meanwhile');
+    clients.push(terminal);
+    const said: unknown[] = [];
+    terminal.node.on(CHAT.event, (payload: unknown) => said.push(payload));
+    await terminal.chatAttach(alphaNode);
+    here();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(said).toEqual([{ session: alphaNode, kind: 'chat', text: expect.stringContaining('Gemini') }]);
   });
 
   it('does not take its own leaving for a lost service: closed, a terminal is told nothing', async () => {

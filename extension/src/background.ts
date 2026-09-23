@@ -286,6 +286,17 @@ async function open(port: number, code: string, label: string): Promise<Connecti
   });
   node.addTransport(transport);
   node.on(EXTENSION_RELOAD, () => chrome.runtime.reload());
+  // A terminal just opened on the service: say now which of its chats this browser shows,
+  // rather than at the next heartbeat — a hidden tab's comes about once a minute.
+  node.on(CHAT.who, (_payload: unknown, envelope) => {
+    if (envelope.source !== SERVICE_NODE) return;
+    void pairings().then((all) => {
+      for (const [tabId, nodeId] of tabShows) {
+        if (all[nodeId]?.port !== port) continue;
+        void chatOfTab(tabId).then((chat) => announce({ node }, nodeId, tabConversation.get(tabId) ?? null, chat?.title, true));
+      }
+    });
+  });
   // A prompt from the operator's terminal. Only the service sends one — it checked the
   // operator's key, and the relay lets nobody else hold its name.
   node.on(CHAT.send, (payload: unknown, envelope) => {
@@ -354,7 +365,7 @@ const announced = new Map<string, number>();
  * Tell the project's service this browser has its chat open, and which chat it is (Meta AI,
  * Gemini…): prompts from a terminal come here. `now` skips the pacing — a chat just bound.
  */
-function announce(conn: Connection, nodeId: string, conversation: string | null, chat: string | undefined, now = false): void {
+function announce(conn: Pick<Connection, 'node'>, nodeId: string, conversation: string | null, chat: string | undefined, now = false): void {
   if (!now && Date.now() - (announced.get(nodeId) ?? 0) < 5_000) return;
   announced.set(nodeId, Date.now());
   conn.node.emit(CHAT.here, { session: nodeId, conversation, ...(chat ? { chat } : {}) }, { target: SERVICE_NODE });
@@ -479,6 +490,8 @@ async function sessionFor(conversation: string | null, tabId: number | undefined
 
 /** The project each chat tab showed at its last status: what it left when that changes. */
 const tabShows = new Map<number, string>();
+/** The conversation each of those tabs shows, as its last status said: what a heartbeat names. */
+const tabConversation = new Map<number, string | null>();
 /** Which tab acts for a conversation open in several. */
 const owners = new ConversationOwners();
 chrome.tabs.onActivated.addListener(({ tabId }) => owners.activated(tabId));
@@ -499,6 +512,8 @@ const shownElsewhere = (nodeId: string): boolean => [...tabShows.values()].inclu
  * services hear it at once — the one left drops it, the one joined says where prompts go.
  */
 async function followTab(tabId: number, nodeId: string | undefined, conversation: string | null): Promise<void> {
+  if (nodeId) tabConversation.set(tabId, conversation);
+  else tabConversation.delete(tabId);
   const before = tabShows.get(tabId);
   if (before === nodeId) return;
   if (nodeId) tabShows.set(tabId, nodeId);
@@ -807,6 +822,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   stateChanged();
   const before = tabShows.get(tabId);
   tabShows.delete(tabId);
+  tabConversation.delete(tabId);
   owners.forget(tabId);
   if (before && !shownElsewhere(before)) void connection(before).then((conn) => leave(conn, before), () => undefined);
 });

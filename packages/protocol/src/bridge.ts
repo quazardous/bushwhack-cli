@@ -101,6 +101,12 @@ export const CHAT = {
   event: 'chat:event',
   /** extension → service, every few seconds: "I have a chat of this project open". */
   here: 'chat:here',
+  /**
+   * service → extensions: "which of my projects' chats do you show?" — each answers at once
+   * with a chat:here per chat. Asked when a terminal opens: it starts knowing, instead of
+   * waiting for a heartbeat that a hidden tab sends about once a minute.
+   */
+  who: 'chat:who',
   reply: 'chat:reply',
 } as const;
 

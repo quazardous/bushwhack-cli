@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A terminal opened while its project's chat was in a background tab said "no browser has its chat open", and kept saying so though the chat worked: the service knew of open chats only from a heartbeat a hidden tab sends about once a minute, and a chat back after going silent was not announced again. A terminal that opens now asks the browsers at once which chats they show (`chat:who`), and a chat back after a silence is announced to the terminals.
+- The first command right after the service started could wait two minutes for nothing: /health named the service as soon as its relay listened, before the service listened on it. It names it once the service answers.
+- A terminal took the approvals before it listened for them: one sent at that moment was lost, and its call waited. It takes them once it listens.
 - Leaving a chat terminal no longer ends on an `ERR_USE_AFTER_CLOSE` stack trace: its own leaving was taken for a lost service, and it tried to say so on a prompt already closed.
 - Windows: the service could not start (it was launched through a bash script), and octopod was never found (npm installs it as a `.cmd`, which cannot be run without a shell): both are now started through node.
 

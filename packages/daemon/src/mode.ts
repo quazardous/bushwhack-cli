@@ -12,8 +12,12 @@ import { dirname, join } from 'node:path';
 export type AppMode = 'octopod' | 'standalone';
 export const APP_MODES: readonly AppMode[] = ['octopod', 'standalone'];
 
+/**
+ * Where the mode is written. An `env` given for the state (a test's, or an instance's) that
+ * says nothing of the configuration leaves it where this process's environment puts it.
+ */
 export function configFile(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'bushwhack', 'config.json');
+  return join(env.XDG_CONFIG_HOME || process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'bushwhack', 'config.json');
 }
 
 /** The mode written at setup; octopod when nothing was, or when the file cannot be read. */

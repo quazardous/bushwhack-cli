@@ -184,14 +184,11 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
     },
     // A new service knows neither the chat this terminal follows nor where approvals go.
     back: async () => {
-      await client.chatAttach(project.nodeId);
       await client.approvalsHere();
+      await client.chatAttach(project.nodeId);
       say(style.dim('  ✻ the service is back'));
     },
   });
-  await client.chatAttach(project.nodeId);
-  await client.approvalsHere();
-
   let rl: Interface;
   // While the chat answers: a spinner and the time it has taken, on the line above the prompt.
   let busy: string | undefined;
@@ -338,6 +335,11 @@ export async function runChatTerminal(options: ChatTerminalOptions): Promise<voi
   });
 
   open();
+  // Only now, every handler in place, take the approvals — one sent sooner would reach a
+  // terminal not listening yet, and wait for ever — then attach, which may wait a moment for
+  // the browsers to say which chat they show.
+  await client.approvalsHere();
+  await client.chatAttach(project.nodeId);
   output.write(`${whereLines((await client.list()) as unknown as ServiceView, project, style).join('\n')}\n\n`);
   if (options.yolo) output.write(`${style.red(`  --yolo: every approval for ${project.session} is a yes, without asking — writes, deletes, app commands. Other projects' are asked; secret values are still yours to type.`)}\n\n`);
   output.write(style.dim(`  chat of ${project.session} — type a prompt; /status; /help; Ctrl-D to leave\n`));

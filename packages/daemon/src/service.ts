@@ -120,6 +120,8 @@ export interface ServiceOptions {
   env?: NodeJS.ProcessEnv;
   out?: (line: string) => void;
   approvalWaitMs?: number;
+  /** How long a browser's chat counts as open after its last heartbeat; 90 s unless a test says. */
+  presenceMs?: number;
   /** Standalone mode: the ports to try for the projects' sites; the mode itself is read from the config. */
   sitePorts?: number[];
 }
@@ -228,7 +230,10 @@ export async function startService(options: ServiceOptions = {}): Promise<Servic
   const wait = options.approvalWaitMs ?? APPROVAL_WAIT_MS;
 
   const sessions: ProjectEntry[] = [];
-  const health: SessionHealth & { daemon: string; instance: string } = { service: 'bushwhack', daemon: file.id, instance, sessions };
+  // No `daemon` yet: /health names the service only once it answers — its node on the relay,
+  // its handlers, its projects back. A client that took the relay listening for the service
+  // ready would ask it before it listens, and wait out its timeout.
+  const health: SessionHealth & { daemon?: string; instance: string } = { service: 'bushwhack', instance, sessions };
   const { relay, port }: { relay: RelayServer; port: number } = await listenRelay({ ports: options.ports, code: file.code, logDir: join(dir, 'logs'), health: health as unknown as Record<string, unknown> });
   // Standalone (chosen at setup): one server for every project's site.
   const sites = (await readMode(options.env)) === 'standalone' ? await ProjectSites.listen(options.sitePorts) : undefined;
@@ -381,7 +386,10 @@ export async function startService(options: ServiceOptions = {}): Promise<Servic
   const presence = new Map<string, Map<string, { at: number; conversation?: string; chat?: string }>>();
   // A hidden tab's timers run about once a minute: its announcements come that seldom.
   // A departure is announced (`left`); this only drops a browser that went silent.
-  const PRESENCE_MS = 90_000;
+  const PRESENCE_MS = options.presenceMs ?? 90_000;
+  /** How long a terminal that opens waits for the browsers to say which chats they show. */
+  const WHO_WAIT_MS = 800;
+  const WHO_EVERY_MS = 10_000;
   /** The chat each project's terminals were last told of: they hear of a change, not of every return. */
   const told = new Map<string, LiveChat | undefined>();
   const chatOf = (session: string): LiveChat | undefined => {
@@ -395,6 +403,21 @@ export async function startService(options: ServiceOptions = {}): Promise<Servic
     for (const watcher of watchers.get(session) ?? []) node.emit(CHAT.event, { session, kind: 'chat', ...(text ? { text } : {}) } satisfies ChatEvent, { target: watcher });
   };
   const browserFor = (session: string): string | undefined => chatOf(session)?.browser;
+  /**
+   * Before saying which chats are open: when one of these projects' is not known to be, ask
+   * the connected browsers now (chat:who) and give them a moment to say — a hidden tab's
+   * heartbeat comes about once a minute. Asked once every few seconds at most.
+   */
+  let askedAt = 0;
+  const askBrowsers = async (projects: string[]): Promise<void> => {
+    const unknown = (): boolean => projects.some((p) => !chatOf(p));
+    if (!unknown() || Date.now() - askedAt < WHO_EVERY_MS) return;
+    if (!relay.connected().some((c) => c.nodeId.startsWith(EXTENSION_NODE_PREFIX))) return;
+    askedAt = Date.now();
+    node.emit(CHAT.who, {}, { target: `${EXTENSION_NODE_PREFIX}*` });
+    const until = Date.now() + WHO_WAIT_MS;
+    while (unknown() && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+  };
   node.on(CHAT.here, (payload: unknown, envelope) => {
     const { session, conversation, chat, left } = (payload ?? {}) as { session?: unknown; conversation?: unknown; chat?: unknown; left?: unknown };
     if (!envelope.source.startsWith(EXTENSION_NODE_PREFIX) || typeof session !== 'string') return;
@@ -412,9 +435,10 @@ export async function startService(options: ServiceOptions = {}): Promise<Servic
     map.set(envelope.source, { at: Date.now(), ...(typeof conversation === 'string' ? { conversation } : {}), ...(typeof chat === 'string' ? { chat } : {}) });
     presence.set(session, map);
     // Another chat, browser or conversation than before: the terminals say where prompts go
-    // now. A new chat getting its id at its first message is the same chat.
+    // now. A new chat getting its id at its first message is the same chat. A chat back after
+    // going silent is news too: the terminals opened meanwhile were told there was none.
     const after = chatOf(session)!;
-    const last = told.get(session);
+    const last = before ? told.get(session) : undefined;
     const moved = !last || last.browser !== after.browser || last.chat !== after.chat || (last.conversation !== undefined && last.conversation !== after.conversation);
     if (moved) tell(session, describeChat({ ...after, browser: browserName(after.browser) }));
     told.set(session, after);
@@ -426,7 +450,8 @@ export async function startService(options: ServiceOptions = {}): Promise<Servic
     const set = watchers.get(session) ?? new Set<string>();
     set.add(envelope.source);
     watchers.set(session, set);
-    reply(envelope, { ok: true });
+    // The terminal starts knowing where its prompts go.
+    void askBrowsers([session]).then(() => reply(envelope, { ok: true }));
   });
   node.on(SERVICE.chatSend, (payload: unknown, envelope) => {
     const p = payload as { session?: unknown; text?: unknown; manifest?: unknown };
@@ -445,8 +470,9 @@ export async function startService(options: ServiceOptions = {}): Promise<Servic
     for (const watcher of watchers.get(event?.session) ?? []) node.emit(CHAT.event, event, { target: watcher });
   });
 
-  node.on(SERVICE.list, (payload: unknown, envelope) => {
+  node.on(SERVICE.list, async (payload: unknown, envelope) => {
     if (!operator(payload)) return reply(envelope, { error: 'not the operator' });
+    await askBrowsers(sessions.map((s) => s.nodeId));
     // Which browsers are connected, and which projects' chats each has open: where prompts go.
     const connected = relay.connected().filter((c) => c.nodeId.startsWith(EXTENSION_NODE_PREFIX));
     const browsers = connected
@@ -484,6 +510,7 @@ export async function startService(options: ServiceOptions = {}): Promise<Servic
     await add(folder).catch((e: Error) => out(`! ${folder}: ${e.message}`));
   }
   restoring = false;
+  health.daemon = file.id;
 
   out(`bushwhack service "${instance}" on ws://127.0.0.1:${port} — ${sessions.length} project${sessions.length === 1 ? '' : 's'}`);
   return {

@@ -15,3 +15,4 @@ export type { ManifestContext, ChatPrompt } from './manifest.js';
 export { PORT_RANGE, rangePorts, BRIDGE, normalizePairingCode, EXTENSION_RELOAD, EXTENSION_NODE_PREFIX, CHAT } from './bridge.js';
 export type { SessionHealth, ToolsListRequest, ToolsListReply, ToolsCallRequest, ToolsCallReply, BridgeError, ChatSendRequest, ChatEvent, Picture } from './bridge.js';
 export { extractFencedBlocks } from './markdown.js';
+export { SPRITE, PALETTE } from './mascot.js';

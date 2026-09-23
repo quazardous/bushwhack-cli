@@ -22,6 +22,7 @@ import { answers, ensureService, operatorClient } from './service-client.js';
 import { runChatOnce, runChatTerminal, styleFor } from './chat-terminal.js';
 import { listReports, markReport, type ListedReport } from './reports.js';
 import { APP_MODES, configFile, readMode, writeMode, type AppMode } from './mode.js';
+import { banner } from './banner.js';
 
 const USAGE = `bushwhack ${VERSION}
 
@@ -184,6 +185,7 @@ async function runDaemon(): Promise<void> {
  * then stay as the approvals terminal.
  */
 async function runHere(): Promise<void> {
+  process.stdout.write(banner(VERSION));
   const here = await realpath(process.cwd());
   // The instance serving this folder, if one does; else the one asked for, or chosen.
   let instance = asked ?? (await instanceOf(here));

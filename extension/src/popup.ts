@@ -98,6 +98,8 @@ function closePanel(): void {
 }
 
 async function main(): Promise<void> {
+  // Which build this is, beside the name: what to say in a bug report, and whether a reload took.
+  $('version').textContent = `v${chrome.runtime.getManifest().version}`;
   const chat = Number(new URLSearchParams(location.search).get('tab'));
   tabId = Number.isInteger(chat) && chat > 0 ? chat : undefined;
   window.addEventListener('keydown', (e) => {

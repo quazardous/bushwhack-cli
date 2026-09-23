@@ -5,3 +5,4 @@ dist-dev/
 .dev-logs/
 .env.local
 .mcp.json
+extension/icons/preview.png

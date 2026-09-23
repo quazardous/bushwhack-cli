@@ -12,7 +12,8 @@
     "ext:build": "node --conditions=bushwhack-src --import tsx extension/build.ts",
     "ext:watch": "node --conditions=bushwhack-src --import tsx extension/build.ts --watch",
     "chromium": "node --conditions=bushwhack-src --import tsx extension/chromium.ts",
-    "ext:dev": "node --conditions=bushwhack-src --import tsx extension/dev.ts"
+    "ext:dev": "node --conditions=bushwhack-src --import tsx extension/dev.ts",
+    "ext:icons": "node --conditions=bushwhack-src --import tsx extension/icons/gen-icons.ts"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.0",

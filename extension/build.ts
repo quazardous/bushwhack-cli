@@ -72,7 +72,9 @@ function manifest(v: string, dev: boolean, key: string): unknown {
     ],
     // No popup: the icon opens the panel over the chat (an overlay, see content.ts), or in a
     // tab of its own on any other page.
-    action: { default_title: 'bushwhack' },
+    action: { default_title: 'bushwhack', default_icon: { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png' } },
+    // A pixel-art adventurer, machete raised (icons/gen-icons.mjs draws him).
+    icons: { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png', 48: 'icons/icon-48.png', 128: 'icons/icon-128.png' },
     // The panel as the overlay frames it: a copy of popup.html, web-accessible only on the
     // chat sites and at a per-session address — no site can frame it on its own to lure
     // clicks. popup.html itself stays a plain extension page: a dynamic-url resource is
@@ -127,6 +129,8 @@ async function statics(control: DevControl | undefined): Promise<void> {
   await writeFile(join(dist, 'manifest.json'), JSON.stringify(manifestJson, null, 2) + '\n');
   await copyFile(join(here, 'src/popup.html'), join(dist, 'popup.html'));
   await copyFile(join(here, 'src/popup.html'), join(dist, 'frame.html'));
+  await mkdir(join(dist, 'icons'), { recursive: true });
+  for (const icon of ['icon-16.png', 'icon-32.png', 'icon-48.png', 'icon-128.png', 'icon.svg']) await copyFile(join(here, 'icons', icon), join(dist, 'icons', icon));
 }
 
 /** Ask the extension, over the dev control relay, to reload itself. */

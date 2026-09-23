@@ -84,3 +84,55 @@ describe('the popup list', () => {
     expect(list.querySelector('.service')!.textContent).toContain('this browser is paired');
   });
 });
+
+describe('forgetting a pairing', () => {
+  const forgotten: string[] = [];
+  const forgetting = (): ListContext => ({ ...ctx(), forget: (s) => forgotten.push(s.nodeId) });
+
+  it('is the service\'s, not a project\'s: one Forget, in the header', () => {
+    const list = document.createElement('div');
+    reconcile(list, [session('shop', true, 'svc'), session('blog', true, 'svc')], forgetting());
+    expect(list.querySelectorAll('.session button')).toHaveLength(0);
+    expect([...list.querySelectorAll('.service button')].map((b) => b.textContent)).toEqual(['Forget…']);
+  });
+
+  it('asks first, says what goes with it, and forgets only on a yes', () => {
+    forgotten.length = 0;
+    const list = document.createElement('div');
+    document.body.append(list);
+    reconcile(list, [session('shop', true, 'svc'), session('blog', true, 'svc')], forgetting());
+    const header = list.querySelector<HTMLElement>('.service')!;
+    header.querySelector<HTMLButtonElement>('button')!.click();
+    const box = header.querySelector('.confirm')!;
+    expect(box.textContent).toContain('its 2 projects leave this list');
+    expect(forgotten).toEqual([]);
+    // Still asked across a refresh, and asked once however often it is clicked.
+    reconcile(list, [session('shop', true, 'svc'), session('blog', true, 'svc')], forgetting());
+    header.querySelector<HTMLButtonElement>('button')!.click();
+    expect(header.querySelectorAll('.confirm')).toHaveLength(1);
+    [...box.querySelectorAll('button')].find((b) => b.textContent === 'Cancel')!.click();
+    expect(header.querySelector('.confirm')).toBeNull();
+    expect(forgotten).toEqual([]);
+    header.querySelector<HTMLButtonElement>('button')!.click();
+    [...header.querySelectorAll<HTMLButtonElement>('.confirm button')].find((b) => b.textContent === 'Forget')!.click();
+    expect(forgotten).toEqual(['shop']);
+    list.remove();
+  });
+});
+
+describe('the pairing code field', () => {
+  it('stands out, takes the keyboard when nothing has it, and pairs on Enter', async () => {
+    const paired: string[] = [];
+    const list = document.createElement('div');
+    document.body.append(list);
+    (document.activeElement as HTMLElement | null)?.blur();
+    reconcile(list, [session('shop', false, 'svc')], { ...ctx(), pair: (_, code) => paired.push(code) });
+    await Promise.resolve();
+    const input = list.querySelector<HTMLInputElement>('input.pair-code')!;
+    expect(document.activeElement).toBe(input);
+    input.value = 'ABCD-EFGH';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(paired).toEqual(['ABCD-EFGH']);
+    list.remove();
+  });
+});

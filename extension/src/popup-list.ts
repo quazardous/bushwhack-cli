@@ -52,27 +52,64 @@ export function shortPath(path: string): string {
 /** A service, or a lone `bushwhack serve` session: what the pairing is with. */
 const groupOf = (s: DiscoveredSession): string => s.service ?? s.nodeId;
 
-function headerShape(s: DiscoveredSession): string {
-  return JSON.stringify([groupOf(s), s.instance, s.port, s.paired]);
+function headerShape(members: DiscoveredSession[]): string {
+  const s = members[0];
+  return JSON.stringify([groupOf(s), s.instance, s.port, s.paired, members.length]);
+}
+
+/**
+ * Forgetting is the service's, like pairing — every one of its projects at once — and it
+ * is asked first, in the panel: a browser dialog would freeze the chat page under it.
+ */
+function askForget(header: HTMLElement, members: DiscoveredSession[], ctx: ListContext): void {
+  if (header.querySelector('.confirm')) return;
+  const s = members[0];
+  const what = s.service ? `the pairing with service ${s.instance ?? ''}`.trimEnd() : `the pairing with ${s.session}`;
+  const projects = s.service ? `its ${members.length} project${members.length === 1 ? '' : 's'}` : 'this project';
+  const yes = el('button', { className: 'danger', textContent: 'Forget' });
+  const no = el('button', { textContent: 'Cancel' });
+  const box = el(
+    'div',
+    { className: 'confirm', role: 'alertdialog' },
+    el('div', {}, el('b', {}, `Forget ${what}?`), ` This browser stops talking to it: ${projects} leave this list, and the chats bound to ${s.service ? 'them' : 'it'} are unbound, until you pair again with its code.`),
+    el('div', { className: 'row' }, yes, no),
+  );
+  yes.onclick = () => {
+    box.remove();
+    ctx.forget(s);
+  };
+  no.onclick = () => box.remove();
+  header.append(box);
+  no.focus();
 }
 
 /**
  * A service's header. Pairing is between this browser and the service — once, for all its
  * projects — so the code field lives here, not on a project.
  */
-function renderHeader(s: DiscoveredSession, ctx: ListContext): HTMLElement {
+function renderHeader(members: DiscoveredSession[], ctx: ListContext): HTMLElement {
+  const s = members[0];
   const name = s.service ? `service ${s.instance ?? ''}`.trimEnd() : `bushwhack serve — ${s.session}`;
   const header = el('div', { className: 'service' }, el('b', {}, name), el('span', { className: 'muted' }, ` · port ${s.port}`));
   header.dataset.group = groupOf(s);
-  header.dataset.shape = headerShape(s);
+  header.dataset.shape = headerShape(members);
   if (s.paired) {
-    header.append(el('span', { className: 'paired' }, ' · this browser is paired'));
+    const forget = el('button', { className: 'quiet', textContent: 'Forget…', title: 'forget this pairing: every project of this service' });
+    forget.onclick = () => askForget(header, members, ctx);
+    header.append(el('span', { className: 'paired' }, ' · this browser is paired'), forget);
     return header;
   }
-  const code = el('input', { type: 'text', placeholder: s.service ? 'its pairing code (bushwhack list) — once, for all its projects' : 'pairing code', autocomplete: 'off' });
-  const pair = el('button', { textContent: 'Pair' });
+  // What to do first: the field stands out, and takes the keyboard when nothing else has it.
+  const code = el('input', { type: 'text', className: 'pair-code', placeholder: s.service ? 'its pairing code (bushwhack list) — once, for all its projects' : 'pairing code', autocomplete: 'off', spellcheck: false });
+  const pair = el('button', { className: 'primary', textContent: 'Pair' });
   pair.onclick = () => ctx.pair(s, code.value);
+  code.onkeydown = (e) => {
+    if (e.key === 'Enter') ctx.pair(s, code.value);
+  };
   header.append(el('div', { className: 'row' }, code, pair));
+  queueMicrotask(() => {
+    if (code.isConnected && (!document.activeElement || document.activeElement === document.body)) code.focus();
+  });
   return header;
 }
 
@@ -111,10 +148,7 @@ function renderSession(s: DiscoveredSession, ctx: ListContext): HTMLElement {
     bind.onclick = () => ctx.bind(s);
     row.append(bind);
   }
-  const forget = el('button', { textContent: 'Forget' });
-  forget.onclick = () => ctx.forget(s);
-  row.append(forget);
-  card.append(row);
+  if (row.childElementCount > 0) card.append(row);
   return card;
 }
 
@@ -133,7 +167,7 @@ export function reconcile(list: HTMLElement, sessions: DiscoveredSession[], ctx:
   for (const s of sessions) groups.set(groupOf(s), [...(groups.get(groupOf(s)) ?? []), s]);
   const cards = [...groups].flatMap(([group, members]) => {
     const oldHeader = headers.get(group);
-    const header = oldHeader && oldHeader.dataset.shape === headerShape(members[0]) ? oldHeader : renderHeader(members[0], ctx);
+    const header = oldHeader && oldHeader.dataset.shape === headerShape(members) ? oldHeader : renderHeader(members, ctx);
     return [
       header,
       ...members.map((s) => {

@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A minimal install, without Docker or octopod: `./setup.sh --standalone` (`.\setup.ps1 -Standalone` on Windows). The chat's app is then the project's own files, served as they are at `http://<project>.localhost:47320/`, and the `page:*` tools look at it. Nothing of the project runs on the machine, and only what `fs:read` reads is served — never `.git/`, `.bushwhack/`, an ignored file or a declared secret file. The chat is told to build what works in the browser alone (its data in the page: localStorage, IndexedDB, or SQLite through WebAssembly). Chosen at setup, never a fallback: `bushwhack mode` says the mode, `bushwhack mode octopod|standalone` changes it.
 - Windows: `setup.ps1` sets bushwhack up in PowerShell — dependencies, the extension, the `bushwhack` command on the PATH (PowerShell, cmd and Git Bash). The service runs as a background process; the app tools work with Docker Desktop and an octopod that has its Windows fixes.
 
+### Changed
+
+- The panel's *Forget* is the service's, next to "this browser is paired", and asks first — in the panel, saying which service, how many projects go with it, and that their chats are unbound. It sat on every project, though it always forgot the whole service.
+- The panel's pairing code field stands out — larger, a halo until it is focused (steady under reduced motion) — takes the keyboard when nothing else has it, and pairs on Enter.
+
 ### Fixed
 
 - Windows: the service could not start (it was launched through a bash script), and octopod was never found (npm installs it as a `.cmd`, which cannot be run without a shell): both are now started through node.

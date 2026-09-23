@@ -39,7 +39,26 @@
     .service:first-child { margin-top: 0; }
     .service b { font-size: 15px; }
     .service .paired { padding: 1px 9px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); font-size: 12px; font-weight: 600; }
-    .service .row { flex-basis: 100%; max-width: 520px; }
+    .service .row { flex-basis: 100%; max-width: 560px; }
+    .service button.quiet { padding: 2px 10px; font-size: 12px; color: var(--muted); }
+    .service button.quiet:hover { border-color: var(--bad); color: var(--bad); }
+
+    /* The pairing code: what to do first, so it stands out — a halo that breathes until focused. */
+    input[type=text].pair-code { padding: 10px 12px; border: 2px solid var(--accent); font-size: 16px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 28%, transparent); animation: halo 1.8s ease-in-out infinite; }
+    input[type=text].pair-code:focus { outline: none; animation: none; box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 38%, transparent); }
+    @keyframes halo { 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--accent) 8%, transparent); } }
+    @media (prefers-reduced-motion: reduce) { input[type=text].pair-code { animation: none; } }
+    /* On a dark page a soft halo disappears: a stronger one, and the field lit from inside. */
+    @media (prefers-color-scheme: dark) {
+      input[type=text].pair-code { background: color-mix(in srgb, var(--accent) 10%, var(--bg)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent); }
+      input[type=text].pair-code:focus { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 60%, transparent); }
+    }
+
+    /* Asked before forgetting a pairing: in the panel, not a browser dialog over the chat. */
+    .confirm { flex-basis: 100%; max-width: 560px; padding: 10px 14px; border: 1px solid var(--bad); border-radius: 10px; background: color-mix(in srgb, var(--bad) 8%, var(--card)); }
+    .confirm .row { margin-top: 8px; }
+    button.danger { border-color: var(--bad); background: var(--bad); color: #fff; }
+    button.danger:hover { filter: brightness(1.08); }
 
     .session { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
     .session > div:first-child { display: flex; align-items: baseline; gap: 2px; }

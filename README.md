@@ -31,7 +31,9 @@ git clone https://github.com/quazardous/bushwhack-cli bushwhack && cd bushwhack
 ```
 
 On Windows, run `.\setup.ps1` in PowerShell instead (the service then runs as a background
-process).
+process). It also puts bushwhack in the notification area: the projects and the chats
+they are live in, a terminal in a project in one click, the pairing code to copy
+(`-NoTray` leaves it out).
 
 A minimal install, without Docker or octopod: `./setup.sh --standalone` (`.\setup.ps1
 -Standalone`). The chat's app is then the project's own files, served as they are at

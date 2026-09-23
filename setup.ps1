@@ -6,6 +6,7 @@ command on your PATH. Safe to run again (after a pull, for instance). Needs no a
   .\setup.ps1 -Dev                   # the same, for development: no production extension build
   .\setup.ps1 -Standalone            # a minimal install: no Docker, no octopod - the chat's app is
                                      # the project's files served as they are, nothing run
+  .\setup.ps1 -NoTray                # ... without the tray icon and its Start menu shortcut
   $env:BIN_DIR="$HOME\bin"; .\setup.ps1   # ... or elsewhere
 
 The command runs the sources: a change to the code needs no new setup, only a restart of
@@ -15,6 +16,7 @@ kept across runs: `bushwhack mode` says it and changes it.
 param(
   [switch]$Dev,
   [switch]$Standalone,
+  [switch]$NoTray,
   [switch]$Help
 )
 $ErrorActionPreference = 'Stop'
@@ -91,7 +93,8 @@ if (-not $onPath) {
 
 $bushwhack = Join-Path $Root 'bin\bushwhack.cmd'
 if ($Standalone) { & $bushwhack mode standalone | Out-Null }
-$mode = ((& $bushwhack mode) -split '\s+' | Where-Object { $_ })[0]
+# `bushwhack mode` says "standalone: ..." or "octopod: ...": its first word, without the colon.
+$mode = ((& $bushwhack mode) -split '\s+' | Where-Object { $_ })[0].TrimEnd(':')
 
 if ($mode -eq 'standalone') {
   Say 'Web app: standalone'
@@ -128,6 +131,35 @@ if ($mode -eq 'standalone') {
     Write-Host '  to install it:  npm i -g @quazardous/octopod; octopod setup   (0.3 or later; not `octopod` alone: another project on npm)'
     Write-Host '  or from a clone, with its tray in the Start menu:  git clone https://github.com/quazardous/octopod, then .\setup.ps1 in it'
   }
+}
+
+if (-not $NoTray) {
+  Say 'The tray icon'
+  $vbs = Join-Path $Root 'bin\bushwhack-tray.vbs'
+  $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'bushwhack.lnk'
+  $link = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
+  $link.TargetPath = 'wscript.exe'
+  $link.Arguments = "`"$vbs`""
+  $link.IconLocation = Join-Path $Root 'extension\icons\tray.ico'
+  $link.Description = 'bushwhack: the service, the projects and their chats'
+  $link.Save()
+  Write-Host "  Start menu: $shortcut"
+  # A tray already running is the one of before this setup: started again, it runs this code.
+  # Asked to quit, it takes its icon away; killed, it would leave a dead one in the
+  # notification area. Killed only when it does not quit.
+  $old = @(Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" | Where-Object { $_.CommandLine -match 'bushwhack-tray\.ps1' })
+  if ($old.Count -gt 0) {
+    try {
+      $quit = [System.Threading.EventWaitHandle]::OpenExisting('Local\bushwhack-tray-quit')
+      $quit.Set() | Out-Null
+      $quit.Dispose()
+    } catch { }
+    foreach ($p in $old) {
+      try { Wait-Process -Id $p.ProcessId -Timeout 5 -ErrorAction Stop } catch { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
+    }
+  }
+  Start-Process -FilePath 'wscript.exe' -ArgumentList "`"$vbs`""
+  Write-Host '  started: the adventurer in the notification area (right-click it; "Start with Windows" is there)'
 }
 
 if ($Dev) {

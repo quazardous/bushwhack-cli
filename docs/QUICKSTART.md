@@ -30,10 +30,14 @@ octopod setup                  # checks Docker, runs its API as a user service, 
 
 Or from a clone: `git clone https://github.com/quazardous/octopod && cd octopod && ./setup.sh`.
 
+On Windows, with Docker Desktop running: octopod 0.3 or later (the same `npm i -g` and
+`octopod setup`), or its clone's `.\setup.ps1`, which also puts its tray in the Start menu —
+the tray runs octopod's API, which its console reads.
+
 bushwhack finds it as `octopod` on your PATH, or wherever `BUSHWHACK_OCTOPOD` points, and
 works with octopod 0.1 or later (its contract 1: `octopod version`); 0.2 or later is better:
 bushwhack then masks the passwords octopod generated for the app by their values, not only
-by their variables' names. Run `./setup.sh` in
+by their variables' names. Run `./setup.sh` (`.\setup.ps1` on Windows) in
 bushwhack again afterwards to check it is seen. Without it, the chat gets
 the file and secret tools only.
 

@@ -101,13 +101,18 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Warn "octopod at $octopod does not answer ``octopod version`` (older than 0.1, or a broken install): npm i -g @quazardous/octopod - the app tools stay off until then"
   } elseif ("$($v.contract)" -eq '1') {
     Write-Host "  octopod: $octopod ($($v.version), contract 1)"
+    # Contract 1 since 0.1, but Windows works from 0.3: docker compose was not found before.
+    $mm = "$($v.version)" -split '[.-]'
+    if ([int]$mm[0] -eq 0 -and [int]$mm[1] -lt 3) {
+      Warn "octopod $($v.version) predates its Windows fixes (0.3): update it (npm i -g @quazardous/octopod, or git pull and .\setup.ps1 in its clone)"
+    }
   } else {
     Warn "octopod at $octopod speaks contract $($v.contract), this bushwhack contract 1: update the older of the two"
   }
 } else {
   Warn 'octopod is not on your PATH (nor BUSHWHACK_OCTOPOD set): the app tools stay off until it is'
-  Write-Host '  to install it:  git clone https://github.com/quazardous/octopod, then .\setup.ps1 in it'
-  Write-Host '  (npm i -g @quazardous/octopod works too once a release has the Windows fixes; not `octopod` alone: another project on npm)'
+  Write-Host '  to install it:  npm i -g @quazardous/octopod; octopod setup   (0.3 or later; not `octopod` alone: another project on npm)'
+  Write-Host '  or from a clone, with its tray in the Start menu:  git clone https://github.com/quazardous/octopod, then .\setup.ps1 in it'
 }
 
 if ($Dev) {

@@ -1,0 +1,13 @@
+{
+  "name": "@bushwhack/protocol",
+  "version": "0.1.0",
+  "description": "The pseudo-MCP spoken in a web chat: frontmatter call blocks, result blocks, tool specs and the manifest",
+  "license": "MIT",
+  "author": "David Berlioz",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "bushwhack-src": "./src/index.ts", "default": "./dist/index.js" } },
+  "files": ["dist"],
+  "scripts": { "build": "tsc", "test": "vitest run", "typecheck": "tsc --noEmit" }
+}

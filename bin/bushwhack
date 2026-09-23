@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Runs the TypeScript sources directly: workspace packages resolve each other through the
+# `bushwhack-src` export condition, and tsx is loaded by absolute path so this works from
+# any folder — the folder you run it in is the session.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+exec node --conditions=bushwhack-src --import "file://$ROOT/node_modules/tsx/dist/esm/index.mjs" \
+  "$ROOT/packages/daemon/src/cli.ts" "$@"

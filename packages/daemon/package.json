@@ -1,0 +1,25 @@
+{
+  "name": "@bushwhack/daemon",
+  "version": "0.1.0",
+  "description": "bushwhack serve: the session daemon \u2014 relay, terminal approval, the tools \u2014 and the CLI clients of it",
+  "license": "MIT",
+  "author": "David Berlioz",
+  "type": "module",
+  "exports": {
+    ".": {
+      "bushwhack-src": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bushwhack/hub": "0.1.0",
+    "@bushwhack/protocol": "0.1.0",
+    "@bushwhack/relay": "0.1.0",
+    "@bushwhack/workspace": "0.1.0",
+    "@bushwhack/secrets": "0.1.0",
+    "@bushwhack/page": "0.1.0"
+  }
+}

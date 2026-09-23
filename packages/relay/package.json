@@ -1,0 +1,27 @@
+{
+  "name": "@bushwhack/relay",
+  "version": "0.1.0",
+  "description": "Local WebSocket relay: registration, per-client isolation, targeted routing",
+  "license": "MIT",
+  "author": "David Berlioz",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "bushwhack-src": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@bushwhack/page",
+  "version": "0.1.0",
+  "description": "The page:* tools: the session app's tab, bounded DOM reading and actions, and the origin check around each",
+  "license": "MIT",
+  "author": "David Berlioz",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "bushwhack-src": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./daemon": {
+      "bushwhack-src": "./src/daemon.ts",
+      "default": "./dist/daemon.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bushwhack/protocol": "0.1.0"
+  }
+}

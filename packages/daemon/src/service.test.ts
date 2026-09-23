@@ -365,9 +365,13 @@ describe('the service', () => {
     await service.close();
     // Watch the list while the service restarts: it never shrinks.
     const seen: number[] = [];
-    const watch = setInterval(() => void readFile(listFile, 'utf8').then((t) => seen.push((JSON.parse(t) as string[]).length), () => undefined), 5);
+    const look = (): Promise<unknown> => readFile(listFile, 'utf8').then((t) => seen.push((JSON.parse(t) as string[]).length), () => undefined);
+    const watch = setInterval(() => void look(), 5);
+    // Before and after too: a restart faster than the first tick would leave nothing seen.
+    await look();
     await start();
     clearInterval(watch);
+    await look();
     expect(Math.min(...seen)).toBe(2);
     expect(service.list()).toHaveLength(2);
   });

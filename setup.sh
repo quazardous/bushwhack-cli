@@ -65,7 +65,7 @@ case ":$PATH:" in
 esac
 
 [ "$STANDALONE" = 1 ] && "$ROOT/bin/bushwhack" mode standalone >/dev/null
-MODE="$("$ROOT/bin/bushwhack" mode | awk '{print $1}')"
+MODE="$("$ROOT/bin/bushwhack" mode | awk '{print $1}' | tr -d ':')"
 
 if [ "$MODE" = standalone ]; then
   say "Web app: standalone"

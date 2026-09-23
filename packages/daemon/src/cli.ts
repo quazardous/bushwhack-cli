@@ -30,7 +30,7 @@ const USAGE = `bushwhack ${VERSION}
                                    approvals for every project in this terminal
   bushwhack add [folder]           let web chats work on this folder (the current one by default)
   bushwhack remove [folder]        stop that
-  bushwhack list                   the projects, and the pairing code
+  bushwhack list [--json]          the projects, and the pairing code
   bushwhack approvals              answer the service's approval requests, in this terminal
   bushwhack daemon                 run the service in the foreground (systemd runs this)
   bushwhack instances              the service's instances: running or not, projects, browsers
@@ -74,7 +74,8 @@ async function instanceOf(folder: string): Promise<string | undefined> {
 
 async function reached(instance: string = asked ?? DEFAULT_INSTANCE): Promise<ServiceFile> {
   const { file, started } = await ensureService({ instance });
-  if (started) console.log(`  started the bushwhack service${instance === DEFAULT_INSTANCE ? '' : ` "${instance}"`}, through ${started}`);
+  // On stderr: a status line, not what the command answers (`list --json` must stay JSON).
+  if (started) console.error(`  started the bushwhack service${instance === DEFAULT_INSTANCE ? '' : ` "${instance}"`}, through ${started}`);
   return file;
 }
 
@@ -136,10 +137,13 @@ async function runInstances(): Promise<void> {
   }
 }
 
-async function runList(): Promise<void> {
+async function runList(rest: string[] = []): Promise<void> {
   await withOperator(async (client) => {
-    const { projects, code } = (await client.list()) as { projects: ProjectEntry[]; code: string };
-    printProjects(projects, code);
+    const listed = (await client.list()) as { projects: ProjectEntry[]; code: string };
+    // For a tool (the Windows tray): the projects, their chats and apps, the browsers, the
+    // pairing code — what `list` shows — and the mode.
+    if (rest.includes('--json')) return console.log(JSON.stringify({ ...listed, mode: await readMode() }, null, 2));
+    printProjects(listed.projects, listed.code);
   });
 }
 
@@ -448,7 +452,7 @@ async function main(argv: string[]): Promise<void> {
     case 'remove':
       return runRemove(rest[0] ?? '.');
     case 'list':
-      return runList();
+      return runList(rest);
     case 'approvals':
       return runApprovals();
     case 'daemon':

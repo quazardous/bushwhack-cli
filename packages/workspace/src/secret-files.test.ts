@@ -94,7 +94,8 @@ describe('the raw file, for the secret:* tools', () => {
     await declare({ 'app/.env': { format: 'dotenv' }, 'api/.env': { format: 'dotenv' } });
     const fresh = await ws.secretFile('api/.env');
     await fresh.write('TOKEN=abc\n');
-    expect((await stat(join(root, 'api/.env'))).mode & 0o777).toBe(0o600);
+    // Windows has no such mode bits: node reports every file as 0o666 there.
+    if (process.platform !== 'win32') expect((await stat(join(root, 'api/.env'))).mode & 0o777).toBe(0o600);
   });
 
   it('refuses a file that is not declared', async () => {

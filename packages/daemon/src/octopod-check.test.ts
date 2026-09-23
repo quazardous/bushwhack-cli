@@ -75,7 +75,8 @@ describe('what starts octopod', () => {
     expect(octopodCommand('octopod', { PATH: base }, 'linux')).toEqual(['octopod', []]);
   });
 
-  it('on Windows, runs the script behind a .cmd shim: npm\'s, or octopod\'s own', async () => {
+  // Real shims on disk, read with the host's paths: on Windows only.
+  it.skipIf(process.platform !== 'win32')('on Windows, runs the script behind a .cmd shim: npm\'s, or octopod\'s own', async () => {
     await writeFile(join(base, 'octopod.cmd'), '@ECHO off\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\node_modules\\@quazardous\\octopod\\bin\\octopod.js" %*\r\n');
     expect(octopodCommand('octopod', { Path: `${join(base, 'none')};${base}` }, 'win32')).toEqual([process.execPath, [join(base, 'node_modules', '@quazardous', 'octopod', 'bin', 'octopod.js')]]);
     await writeFile(join(base, 'own.cmd'), '@echo off\r\nrem octopod shim for C:\\octopod\r\nrem entry C:\\octopod\\bin\\octopod.js\r\nnode "C:\\octopod\\bin\\octopod.js" %*\r\n');

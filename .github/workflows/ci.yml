@@ -17,6 +17,9 @@ jobs:
       run:
         shell: bash
     steps:
+      # The Windows runner's TEMP is a short 8.3 path (RUNNER~1): the tests compare folders
+      # with the real paths bushwhack resolves. A long one, on every runner.
+      - run: for v in TMP TEMP TMPDIR; do echo "$v=$RUNNER_TEMP" >> "$GITHUB_ENV"; done
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

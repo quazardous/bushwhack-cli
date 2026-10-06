@@ -55,7 +55,13 @@ function Start-Command([string]$file, [string[]]$arguments) {
     }
 }
 # The CLI itself, through node: a .cmd would need a shell, and a console would flash.
-function Start-Bushwhack([string[]]$arguments) { return Start-Command 'node' (@('--conditions=bushwhack-src', '--import', $tsx, $cli) + $arguments) }
+# The compiled CLI when setup.ps1 built it (Smart App Control lets node run it, not the
+# esbuild.exe that tsx needs); the sources otherwise (setup.ps1 -Dev).
+function Start-Bushwhack([string[]]$arguments) {
+    $compiled = Join-Path $root 'packages\daemon\dist\cli.js'
+    if (Test-Path $compiled) { return Start-Command 'node' (@($compiled) + $arguments) }
+    return Start-Command 'node' (@('--conditions=bushwhack-src', '--import', $tsx, $cli) + $arguments)
+}
 
 # $null while it runs; then @{ code; out; err }.
 function Receive-Command($c) {

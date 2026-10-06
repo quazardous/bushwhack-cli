@@ -43,15 +43,24 @@ Write-Host "  node $(node -v)"
 Say 'Installing dependencies'
 Push-Location $Root
 try {
-  npm install --no-fund --no-audit
+  # Without install scripts: esbuild's runs esbuild.exe, an unsigned binary Smart App Control
+  # blocks, and npm would give up. Nothing below runs it: the CLI is compiled by tsc, and the
+  # extension built by esbuild-wasm when the binary may not run.
+  npm install --no-fund --no-audit --ignore-scripts
   if ($LASTEXITCODE -ne 0) { Fail 'npm install failed' }
 
   if ($Dev) {
+    # The sources, through tsx: the compiled CLI would shadow them.
+    Get-ChildItem (Join-Path $Root 'packages') -Directory | ForEach-Object { Remove-Item (Join-Path $_.FullName 'dist') -Recurse -Force -ErrorAction SilentlyContinue }
     Say 'Extension: development build'
     Write-Host '  not built here: npm run ext:watch builds extension/dist-dev on every change and reloads it'
   } else {
+    Say 'Compiling bushwhack'
+    npm run --silent build
+    if ($LASTEXITCODE -ne 0) { Fail 'the build failed' }
+    Write-Host "  the command runs $Root\packages\daemon\dist (run this again after a change to the sources)"
     Say 'Building the extension'
-    npm run --silent ext:build
+    npm run --silent ext:build:node
     if ($LASTEXITCODE -ne 0) { Fail 'the extension build failed' }
     Write-Host "  built into $Root\extension\dist"
   }
@@ -81,6 +90,7 @@ $rootSlash = $Root -replace '\\', '/'
 #!/bin/sh
 # $marker $Root
 ROOT='$rootSlash'
+[ -f "`$ROOT/packages/daemon/dist/cli.js" ] && exec node "`$ROOT/packages/daemon/dist/cli.js" "`$@"
 exec node --conditions=bushwhack-src --import "file:///`$ROOT/node_modules/tsx/dist/esm/index.mjs" "`$ROOT/packages/daemon/src/cli.ts" "`$@"
 
 "@)

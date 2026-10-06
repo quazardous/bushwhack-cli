@@ -35,7 +35,7 @@ function Fail($m) { Write-Host "x $m" -ForegroundColor Red; exit 1 }
 
 Say 'Checking requirements'
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Fail 'Node.js is not installed (22 or later is needed)' }
-$major = [int](node -p 'process.versions.node.split(".")[0]')
+$major = [int](node -p "process.versions.node.split('.')[0]")
 if ($major -lt 22) { Fail "Node.js $(node -v) is too old: 22 or later is needed" }
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { Fail 'npm is not installed' }
 Write-Host "  node $(node -v)"
@@ -109,7 +109,7 @@ if ($mode -eq 'standalone') {
 } else {
   Say 'Web app tools (optional)'
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Warn 'Docker is not installed: octopod mode needs it (.\setup.ps1 -Standalone: the project's files served as a site instead)'
+    Warn 'Docker is not installed: octopod mode needs it (.\setup.ps1 -Standalone: the project''s files served as a site instead)'
   } elseif (-not $(docker compose version 2>$null | Out-Null; $LASTEXITCODE -eq 0)) {
     Warn 'Docker Compose v2 (docker compose) is missing: the app tools need it'
   } elseif (-not $(docker info 2>$null | Out-Null; $LASTEXITCODE -eq 0)) {

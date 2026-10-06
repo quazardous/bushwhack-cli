@@ -35,7 +35,7 @@ function Fail($m) { Write-Host "x $m" -ForegroundColor Red; exit 1 }
 
 Say 'Checking requirements'
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Fail 'Node.js is not installed (22 or later is needed)' }
-$major = [int](node -p 'process.versions.node.split(".")[0]')
+$major = [int](node -p "process.versions.node.split('.')[0]")
 if ($major -lt 22) { Fail "Node.js $(node -v) is too old: 22 or later is needed" }
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { Fail 'npm is not installed' }
 Write-Host "  node $(node -v)"

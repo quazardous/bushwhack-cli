@@ -46,7 +46,7 @@
     function Get-NodeMajor {
         $node = Get-Command node -ErrorAction SilentlyContinue
         if (-not $node) { return 0 }
-        try { return [int](& $node.Source -p 'process.versions.node.split(".")[0]') } catch { return 0 }
+        try { return [int](& $node.Source -p "process.versions.node.split('.')[0]") } catch { return 0 }
     }
 
     Say 'Node.js'

@@ -20,7 +20,10 @@ for another folder). It needs no root, and is safe to run again after a pull. Wh
 Shell runs, it also installs bushwhack's top bar indicator (`--no-gnome` leaves it out),
 found at your next login under Wayland.
 
-On Windows, `.\setup.ps1` in PowerShell does the same (`powershell -ExecutionPolicy Bypass -File .\setup.ps1`
+On Windows, the one line `irm https://raw.githubusercontent.com/quazardous/bushwhack-cli/main/install.ps1 | iex`
+fetches bushwhack (and a portable Node.js when there is none) into `%LOCALAPPDATA%\bushwhack`
+and runs `setup.ps1` there (`$env:BUSHWHACK_SETUP_ARGS` passes it options, `-UseOctopod` say).
+From a clone, `.\setup.ps1` in PowerShell does the same (`powershell -ExecutionPolicy Bypass -File .\setup.ps1`
 where scripts are not allowed); the service then runs as a
 background process, and bushwhack sits in the notification area (`-NoTray` leaves it out).
 

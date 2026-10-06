@@ -51,33 +51,32 @@ in all, and they are all below: copy, paste, press Enter.
 
 You need:
 
-- **Node.js 22 or later** — [nodejs.org](https://nodejs.org), the *LTS* version. Check with
-  `node -v` in a terminal.
 - **Chrome or Chromium.**
 - An account on **meta.ai**, **Gemini** or **ChatGPT**.
+- On Linux, **Node.js 22 or later** — [nodejs.org](https://nodejs.org), the *LTS* version
+  (check with `node -v`). On Windows the installer fetches it when it is missing.
 
 ### 1️⃣ Install bushwhack
 
-[**Download the ZIP**](https://github.com/quazardous/bushwhack-cli/archive/refs/heads/main.zip)
-and unzip it somewhere it can stay (your home folder, say). Then, in a terminal, go into
-that folder and run the installer:
+**Windows** — paste this line in PowerShell, press Enter:
 
-```sh
-# Windows (PowerShell)
-cd ~\bushwhack-cli-main
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
+```powershell
+irm https://raw.githubusercontent.com/quazardous/bushwhack-cli/main/install.ps1 | iex
 ```
 
+It puts bushwhack in `%LOCALAPPDATA%\bushwhack` (Node.js too, when there is none), adds the
+`bushwhack` command, and opens the extensions page and the folder to load there. The same
+line updates it. For octopod (apps in Docker), first: `$env:BUSHWHACK_SETUP_ARGS='-UseOctopod'`.
+
+**Linux** — clone, then run the installer:
+
 ```sh
-# Linux
-cd ~/bushwhack-cli-main
+git clone https://github.com/quazardous/bushwhack-cli && cd bushwhack-cli
 ./setup.sh
 ```
 
 It takes a minute or two. If it ends by saying a folder "is not on your PATH", copy the line
 it shows, paste it, press Enter, then close the terminal and open a new one.
-
-(Using git? `git clone https://github.com/quazardous/bushwhack-cli` works just as well.)
 
 bushwhack also gets an icon of its own: in the notification area on Windows, in the top bar
 on GNOME (after you log out and back in). 🎒
@@ -86,7 +85,8 @@ on GNOME (after you log out and back in). 🎒
 
 1. Go to `chrome://extensions` (type it in the address bar).
 2. Turn on **Developer mode**, top right.
-3. Click **Load unpacked** and pick the `extension/dist` folder, inside the one you unzipped.
+3. Click **Load unpacked** and pick bushwhack's `extension/dist` folder (on Windows
+   `%LOCALAPPDATA%\bushwhack\app\extension\dist`, the folder the installer opened).
 4. Pin the bushwhack icon (the puzzle piece → 📌) so it stays in sight.
 
 ### 3️⃣ Share a folder

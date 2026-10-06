@@ -17,11 +17,30 @@ import { watch as fsWatch } from 'node:fs';
 import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as esbuild from 'esbuild';
+import * as nativeEsbuild from 'esbuild';
 import { DRIVERS } from '@bushwhack/chat-drivers';
 import { EXTENSION_NODE_PREFIX, EXTENSION_RELOAD } from '@bushwhack/protocol';
 import { RelayServer } from '@bushwhack/relay';
-import { connectDev, devControl, type DevControl } from './dev-control.js';
+// `.ts`: Node runs this file itself (setup.ps1, under Smart App Control), with no tsx to
+// map a `.js` specifier to its source.
+import { connectDev, devControl, type DevControl } from './dev-control.ts';
+
+/**
+ * esbuild, native when its binary may run; esbuild-wasm otherwise — Smart App Control
+ * (Windows) blocks esbuild.exe, an unsigned binary. The same version, the same API.
+ */
+async function loadEsbuild(): Promise<typeof nativeEsbuild> {
+  // BUSHWHACK_ESBUILD=wasm: esbuild-wasm whatever the machine allows (to test it, or to rule
+  // the binary out).
+  if (process.env.BUSHWHACK_ESBUILD === 'wasm') return (await import('esbuild-wasm')) as unknown as typeof nativeEsbuild;
+  try {
+    await nativeEsbuild.transform('');
+    return nativeEsbuild;
+  } catch {
+    console.log('esbuild: its binary may not run here (Smart App Control?) - esbuild-wasm builds instead');
+    return (await import('esbuild-wasm')) as unknown as typeof nativeEsbuild;
+  }
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 /**
@@ -84,7 +103,7 @@ function manifest(v: string, dev: boolean, key: string): unknown {
   };
 }
 
-const buildOptions = (control: DevControl | undefined): esbuild.BuildOptions => ({
+const buildOptions = (control: DevControl | undefined): nativeEsbuild.BuildOptions => ({
   outdir: dist,
   entryPoints: {
     background: join(here, 'src/background.ts'),
@@ -154,6 +173,7 @@ async function main(): Promise<void> {
   dist = distFor(watch);
   await rm(dist, { recursive: true, force: true });
   await statics(control);
+  const esbuild = await loadEsbuild();
   if (!watch || !control) {
     await esbuild.build(buildOptions(undefined));
     console.log(`built ${dist}`);

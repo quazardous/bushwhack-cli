@@ -18,7 +18,8 @@
     ],
     "customConditions": [
       "bushwhack-src"
-    ]
+    ],
+    "allowImportingTsExtensions": true
   },
   "include": [
     "src",

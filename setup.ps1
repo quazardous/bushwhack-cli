@@ -43,15 +43,24 @@ Write-Host "  node $(node -v)"
 Say 'Installing dependencies'
 Push-Location $Root
 try {
-  npm install --no-fund --no-audit
+  # Without install scripts: esbuild's runs esbuild.exe, an unsigned binary Smart App Control
+  # blocks, and npm would give up. Nothing below runs it: the CLI is compiled by tsc, and the
+  # extension built by esbuild-wasm when the binary may not run.
+  npm install --no-fund --no-audit --ignore-scripts
   if ($LASTEXITCODE -ne 0) { Fail 'npm install failed' }
 
   if ($Dev) {
+    # The sources, through tsx: the compiled CLI would shadow them.
+    Get-ChildItem (Join-Path $Root 'packages') -Directory | ForEach-Object { Remove-Item (Join-Path $_.FullName 'dist') -Recurse -Force -ErrorAction SilentlyContinue }
     Say 'Extension: development build'
     Write-Host '  not built here: npm run ext:watch builds extension/dist-dev on every change and reloads it'
   } else {
+    Say 'Compiling bushwhack'
+    npm run --silent build
+    if ($LASTEXITCODE -ne 0) { Fail 'the build failed' }
+    Write-Host "  the command runs $Root\packages\daemon\dist (run this again after a change to the sources)"
     Say 'Building the extension'
-    npm run --silent ext:build
+    npm run --silent ext:build:node
     if ($LASTEXITCODE -ne 0) { Fail 'the extension build failed' }
     Write-Host "  built into $Root\extension\dist"
   }
@@ -81,6 +90,7 @@ $rootSlash = $Root -replace '\\', '/'
 #!/bin/sh
 # $marker $Root
 ROOT='$rootSlash'
+[ -f "`$ROOT/packages/daemon/dist/cli.js" ] && exec node "`$ROOT/packages/daemon/dist/cli.js" "`$@"
 exec node --conditions=bushwhack-src --import "file:///`$ROOT/node_modules/tsx/dist/esm/index.mjs" "`$ROOT/packages/daemon/src/cli.ts" "`$@"
 
 "@)
@@ -109,7 +119,7 @@ if ($mode -eq 'standalone') {
 } else {
   Say 'Web app tools (optional)'
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Warn 'Docker is not installed: octopod mode needs it (.\setup.ps1 -Standalone: the project''s files served as a site instead)'
+    Warn 'Docker is not installed: octopod mode needs it (bushwhack mode standalone: the project''s files served as a site instead)'
   } elseif (-not $(docker compose version 2>$null | Out-Null; $LASTEXITCODE -eq 0)) {
     Warn 'Docker Compose v2 (docker compose) is missing: the app tools need it'
   } elseif (-not $(docker info 2>$null | Out-Null; $LASTEXITCODE -eq 0)) {
@@ -140,11 +150,14 @@ if ($mode -eq 'standalone') {
 
 if (-not $NoTray) {
   Say 'The tray icon'
-  $vbs = Join-Path $Root 'bin\bushwhack-tray.vbs'
+  # The tray with no window at all: conhost --headless. Not a .vbs through wscript: Windows
+  # is removing VBScript, and a fresh install may not have it.
+  $tray = Join-Path $Root 'bin\bushwhack-tray.ps1'
+  $trayArgs = "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$tray`""
   $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'bushwhack.lnk'
   $link = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
-  $link.TargetPath = 'wscript.exe'
-  $link.Arguments = "`"$vbs`""
+  $link.TargetPath = Join-Path $env:windir 'System32\conhost.exe'
+  $link.Arguments = $trayArgs
   $link.IconLocation = Join-Path $Root 'extension\icons\tray.ico'
   $link.Description = 'bushwhack: the service, the projects and their chats'
   $link.Save()
@@ -163,7 +176,11 @@ if (-not $NoTray) {
       try { Wait-Process -Id $p.ProcessId -Timeout 5 -ErrorAction Stop } catch { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
     }
   }
-  Start-Process -FilePath 'wscript.exe' -ArgumentList "`"$vbs`""
+  # "Start with Windows" set by an older tray ran the .vbs: the same command as the shortcut now.
+  $run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+  $was = (Get-ItemProperty -Path $run -Name 'bushwhack-tray' -ErrorAction SilentlyContinue).'bushwhack-tray'
+  if ($was -and $was -match '\.vbs') { Set-ItemProperty -Path $run -Name 'bushwhack-tray' -Value "conhost.exe $trayArgs" -Type String }
+  Start-Process -FilePath 'conhost.exe' -ArgumentList $trayArgs
   Write-Host '  started: the adventurer in the notification area (right-click it; "Start with Windows" is there)'
 }
 

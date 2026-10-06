@@ -101,8 +101,23 @@
                 if ($health.daemon -eq $s.id -and $s.pid) { Stop-Process -Id $s.pid -Force -ErrorAction SilentlyContinue; Write-Host '  stopped the running service' }
             } catch { }
         }
+        # An Explorer window on a folder in it holds it too: the one this script opened on
+        # extension\dist last time, often still there.
+        try {
+            $appUrl = 'file:///' + ($app -replace '\\', '/')
+            foreach ($w in @((New-Object -ComObject Shell.Application).Windows())) {
+                if ($w.LocationURL -and $w.LocationURL.StartsWith($appUrl, [StringComparison]::OrdinalIgnoreCase)) { $w.Quit() }
+            }
+        } catch { }
+        # A process killed lets go of its files a moment later.
         $old = "$app.old-$(Get-Date -Format yyyyMMddHHmmss)"
-        try { Rename-Item $app $old } catch { Fail "$app is in use (a terminal or a program in it?): close it, and run this again" }
+        for ($try = 1; $true; $try++) {
+            try { Rename-Item $app $old; break }
+            catch {
+                if ($try -ge 10) { Fail "$app is in use (a terminal or a program in it?): close it, and run this again" }
+                Start-Sleep -Seconds 1
+            }
+        }
         Remove-Item $old -Recurse -Force -ErrorAction SilentlyContinue
     }
     New-Item -ItemType Directory -Force $home_ | Out-Null

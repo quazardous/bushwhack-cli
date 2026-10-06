@@ -6,7 +6,7 @@
 # running when the tray quits. Everything goes through the CLI (`bushwhack list --json`),
 # in background processes a timer collects, so the menu never waits on the service.
 #
-# Started hidden by bushwhack-tray.vbs (the Start menu shortcut, and "Start with
+# Started with no window by conhost --headless (the Start menu shortcut, and "Start with
 # Windows"), or by bushwhack-tray.cmd from a terminal.
 #
 # Keep this file ASCII-only: Windows PowerShell 5.1 (powershell.exe) reads a BOM-less
@@ -126,8 +126,8 @@ function Test-Autostart {
 }
 function Set-Autostart([bool]$on) {
     if ($on) {
-        $vbs = Join-Path $PSScriptRoot 'bushwhack-tray.vbs'
-        Set-ItemProperty -Path $runKey -Name $runName -Value "wscript.exe `"$vbs`"" -Type String
+        # conhost --headless: no window, and no VBScript (Windows is removing it).
+        Set-ItemProperty -Path $runKey -Name $runName -Value "conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Type String
     } else {
         Remove-ItemProperty -Path $runKey -Name $runName -ErrorAction SilentlyContinue
     }

@@ -150,11 +150,14 @@ if ($mode -eq 'standalone') {
 
 if (-not $NoTray) {
   Say 'The tray icon'
-  $vbs = Join-Path $Root 'bin\bushwhack-tray.vbs'
+  # The tray with no window at all: conhost --headless. Not a .vbs through wscript: Windows
+  # is removing VBScript, and a fresh install may not have it.
+  $tray = Join-Path $Root 'bin\bushwhack-tray.ps1'
+  $trayArgs = "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$tray`""
   $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'bushwhack.lnk'
   $link = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
-  $link.TargetPath = 'wscript.exe'
-  $link.Arguments = "`"$vbs`""
+  $link.TargetPath = Join-Path $env:windir 'System32\conhost.exe'
+  $link.Arguments = $trayArgs
   $link.IconLocation = Join-Path $Root 'extension\icons\tray.ico'
   $link.Description = 'bushwhack: the service, the projects and their chats'
   $link.Save()
@@ -173,7 +176,11 @@ if (-not $NoTray) {
       try { Wait-Process -Id $p.ProcessId -Timeout 5 -ErrorAction Stop } catch { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
     }
   }
-  Start-Process -FilePath 'wscript.exe' -ArgumentList "`"$vbs`""
+  # "Start with Windows" set by an older tray ran the .vbs: the same command as the shortcut now.
+  $run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+  $was = (Get-ItemProperty -Path $run -Name 'bushwhack-tray' -ErrorAction SilentlyContinue).'bushwhack-tray'
+  if ($was -and $was -match '\.vbs') { Set-ItemProperty -Path $run -Name 'bushwhack-tray' -Value "conhost.exe $trayArgs" -Type String }
+  Start-Process -FilePath 'conhost.exe' -ArgumentList $trayArgs
   Write-Host '  started: the adventurer in the notification area (right-click it; "Start with Windows" is there)'
 }
 

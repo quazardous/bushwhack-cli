@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Windows: install in one line, `irm https://raw.githubusercontent.com/quazardous/bushwhack-cli/main/install.ps1 | iex` in PowerShell — bushwhack, and a portable Node.js when there is none, in `%LOCALAPPDATA%\bushwhack`; the same line updates it. Standalone by default, `$env:BUSHWHACK_SETUP_ARGS='-UseOctopod'` for octopod.
+
+### Fixed
+
+- Windows: bushwhack installs and runs under Smart App Control, which blocks unsigned programs: it runs compiled with Node alone, and the extension builds without esbuild's binary.
+- Windows: the tray starts on a Windows without VBScript (being removed from Windows); it used to never appear there.
+- Windows: `setup.ps1` no longer says Node.js 22+ is too old under Windows PowerShell 5.1, and parses again.
+
 ## [0.3.0] - 2026-09-23
 
 ### Added
